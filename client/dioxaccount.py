@@ -48,7 +48,6 @@ class DioxAddress:
             char_set = r'[\w\d|_|-|!|#|$|@|&|^|*|(|)|\[|\]|{|}|<|>|,|;|?|~]+'
         else:
             return False
-        
         if len(name)>name_len_max or len(name)<name_len_min or re.fullmatch(char_set,name) is None:
             return False
         return True
@@ -90,6 +89,8 @@ class DioxAddress:
     def type(self,type):
         self.__type = type
 
+#--------------------------------------------------------------------------------
+
 class DioxAccount:
     __private_key = None
     __public_key = None
@@ -106,59 +107,59 @@ class DioxAccount:
         s = '"PrivateKey":{},"PublicKey":{},"Address":{},"AddressType":{}'.format(self.sk_b64,self.pk_b64,self.address,self.account_type.name)
         return "{"+s+"}"
 
+
+    #TODO support other type of key
     @staticmethod
-    def from_key(key,encoding="base64",type=DioxAccountType.ED25519):
-        if type == DioxAccountType.ED25519:
-            sk_bytes = base64.b64decode(key)[0:32]
-            sk = ed25519.SigningKey(sk_s=sk_bytes)
-            vk = sk.get_verifying_key()
-            crc = 3 | (0xfffffff0 & crc32c.crc32c(vk.vk_s, 3))
-            address = vk.vk_s + crc.to_bytes(4, 'little')
-            return DioxAccount(sk.sk_s,vk.vk_s,address,type)
-        elif type == DioxAccountType.ETHEREUM:
+    def from_key(key,type=DioxAccountType.ED25519):
+        try:
+            if type == DioxAccountType.ED25519:
+                sk_bytes = base64.b64decode(key)[0:32]
+                sk = ed25519.SigningKey(sk_s=sk_bytes)
+                vk = sk.get_verifying_key()
+                crc = 3 | (0xfffffff0 & crc32c.crc32c(vk.vk_s, 3))
+                address = vk.vk_s + crc.to_bytes(4, 'little')
+                return DioxAccount(sk.sk_s,vk.vk_s,address,type)
+            else:
+                return None
+        except:
             return None
-        elif type == DioxAccountType.SM2:
-            return None
-        else:
-            return None
-    
+        
+    #TODO support other type of key
     @staticmethod
     def from_json(json,type=DioxAccountType.ED25519):
-        sk = None
-        pk = None
-        addr = None
-        if type == DioxAccountType.ED25519:
-            if json["PrivateKey"] is not None:
-                sk = base64.b64decode(json["PrivateKey"])
-            if json["PublicKey"] is not None:
-                pk = base64.b64decode(json["PublicKey"])
-            if json["Address"] is not None:
-                decoder = krock32.Decoder()
-                decoder.update(str(json["Address"]).split(":")[0])
-                addr = decoder.finalize()
-            account = DioxAccount(sk,pk,addr,DioxAccountType.ED25519)
-            return account if account.is_valid() else None
-        elif type == DioxAccountType.ETHEREUM:
+        try:
+            sk = None
+            pk = None
+            addr = None
+            if type == DioxAccountType.ED25519:
+                if json["PrivateKey"] is not None:
+                    sk = base64.b64decode(json["PrivateKey"])
+                if json["PublicKey"] is not None:
+                    pk = base64.b64decode(json["PublicKey"])
+                if json["Address"] is not None:
+                    decoder = krock32.Decoder()
+                    decoder.update(str(json["Address"]).split(":")[0])
+                    addr = decoder.finalize()
+                account = DioxAccount(sk,pk,addr,DioxAccountType.ED25519)
+                return account if account.is_valid() else None
+            else:
+                None
+        except:
             return None
-        elif type == DioxAccountType.SM2:
-            return None
-        else:
-            raise RuntimeError("error account_type")
 
-
+    #TODO support other type of key
     @staticmethod
     def generate_key_pair(account_type=DioxAccountType.ED25519):
-        if account_type == DioxAccountType.ED25519:
-            sk, pk = ed25519.create_keypair()
-            crc = 3 | (0xfffffff0 & crc32c.crc32c(pk.vk_s, 3))
-            address = pk.vk_s + crc.to_bytes(4, 'little')
-            return DioxAccount(sk.sk_s,pk.vk_s,address,DioxAccountType.ED25519)
-        elif account_type == DioxAccountType.ETHEREUM:
+        try:
+            if account_type == DioxAccountType.ED25519:
+                sk, pk = ed25519.create_keypair()
+                crc = 3 | (0xfffffff0 & crc32c.crc32c(pk.vk_s, 3))
+                address = pk.vk_s + crc.to_bytes(4, 'little')
+                return DioxAccount(sk.sk_s,pk.vk_s,address,DioxAccountType.ED25519)
+            else:
+                return None
+        except:
             return None
-        elif account_type == DioxAccountType.SM2:
-            return None
-        else:
-            raise RuntimeError("error account_type")
 
     @property
     def sk_b64(self):
@@ -218,6 +219,18 @@ class DioxAccount:
         ret.update({"AddressType":self.account_type.name})
         return ret
 
-    def sign(self,data):
-        pass
+    def sign(self,msg):
+        try:
+            sk = ed25519.SigningKey(sk_s=self.__private_key)
+            sig = sk.sign(msg)
+        except:
+            return None
+        return sig
 
+    def verify(self,sig,msg):
+        try:
+            pk = ed25519.VerifyingKey(vk_s=self.__public_key)
+            pk.verify(sig,msg)
+        except:
+            return False
+        return True

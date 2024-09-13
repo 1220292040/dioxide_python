@@ -2,8 +2,7 @@
 import os,sys
 sys.path.append('.')
 
-from client.dioxaccount import DioxAccount,DioxAccountType,DioxAddress,DioxAddressType
-
+from client.dioxaccount import DioxAccount,DioxAddress,DioxAddressType
 
 account0 = DioxAccount.generate_key_pair()
 print(account0)
@@ -51,3 +50,13 @@ for d in ["ab","abcd","abcdefgha"]:
         print(name_address)
     else:
         print("invalid name:{}".format(d))
+
+
+msg = "helloworld".encode()
+sig = account0.sign(msg)
+print(sig)
+
+print(account0.verify(sig,msg))
+
+msg = "helloworl".encode()
+print(account0.verify(sig,msg))

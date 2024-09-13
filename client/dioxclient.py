@@ -8,6 +8,7 @@ from client.stat import StatTool
 from client_config import Config
 from utils.rpc import HTTPProvide
 from client.dioxaccount import DioxAccount
+from utils.gadget import exception_handler
 
 class DioxError(Exception):
     code = None
@@ -19,8 +20,6 @@ class DioxError(Exception):
         return "code :{},message : {}".format(self.code, self.message)
 
 #-----------------------------------------------------------------------------------------------------
-
-
 class DioxClient:
     rpc = None
     logger = clientlogger.client_logger
@@ -61,13 +60,16 @@ class DioxClient:
         return None
     
 #rpc method ----------------------------------------------------------------
+    @exception_handler
     def get_overview(self):
         return self.make_request("dx.overview",{})
     
+    @exception_handler
     def get_block_number(self):
         respone = self.make_request("dx.committed_head_height",{})
         return respone["HeadHeight"]
 
+    @exception_handler
     def get_shard_index(self,scope,scope_key):
         method = "dx.shard_index"
         params = {}
