@@ -1,5 +1,6 @@
 import base64
 import ed25519
+import krock32.decode
 import crc32c # type: ignore
 import krock32
 from enum import Enum
@@ -30,6 +31,17 @@ class DioxAddress:
 
     def __str__(self):
         return "{}".format(self.address)
+
+    def __eq__(self, other):
+        if isinstance(other,str):
+            return self.address.split(":")[0] == other.split(":")[0]
+        else:
+            if type(self) == type(other) and \
+                self.__type == other.type and \
+                self.address.split(":")[0] == other.address.split(":")[0]:
+                return True
+            else:
+                return False
 
     def is_delegatee_name_valid(self,name:str):
         name_len_max = 0
@@ -62,6 +74,16 @@ class DioxAddress:
             return True
         else:
             return False
+
+    @staticmethod
+    def from_key(key:str):
+        decoder = krock32.Decoder()
+        decoder.update(key.split(":")[0])
+        addr = decoder.finalize()
+        if len(addr) == 36:
+            return DioxAddress(addr)
+        else:
+            return None
         
     @property
     def address(self):

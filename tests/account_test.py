@@ -60,3 +60,8 @@ print(account0.verify(sig,msg))
 
 msg = "helloworl".encode()
 print(account0.verify(sig,msg))
+
+key = "cqt3xyv2zb4fzwbdy8wn94akxavxk1srdvb69x8a42xsn34k1fes700f60:ed25519".encode()
+addr = DioxAddress.from_key(key.decode())
+print(addr,account2.address)
+print(addr == account2.address)

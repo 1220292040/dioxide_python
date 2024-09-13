@@ -9,6 +9,7 @@ from client_config import Config
 from utils.rpc import HTTPProvide
 from client.account import DioxAccount
 from utils.gadget import exception_handler
+from attributedict.collections import AttributeDict
 
 class DioxError(Exception):
     code = None
@@ -78,17 +79,43 @@ class DioxClient:
         response = self.make_request(method,params)
         return response["ShardIndex"]
 
-    def get_consensus_header_by_height(self):
-        pass
+    @exception_handler
+    def get_consensus_header_by_height(self,height):
+        method = "dx.consensus_header"
+        params = {}
+        params.update({"query_type":0})
+        params.update({"height":height})
+        response = self.make_request(method,params)
+        return AttributeDict(response)
 
-    def get_consensus_header_by_hash(self):
-        pass
+    @exception_handler
+    def get_consensus_header_by_hash(self,hash:str):
+        method = "dx.consensus_header"
+        params = {}
+        params.update({"query_type":1})
+        params.update({"hash":hash})
+        response = self.make_request(method,params)
+        return AttributeDict(response)
 
-    def get_transaction_block_by_height(self):
-        pass
+    @exception_handler
+    def get_transaction_block_by_height(self,shard_index,height):
+        method = "dx.transaction_block"
+        params = {}
+        params.update({"query_type":0})
+        params.update({"shard_index":shard_index})
+        params.update({"height":height})
+        response = self.make_request(method,params)
+        return AttributeDict(response)
 
-    def get_transaction_block_by_hash(self):
-        pass
+    @exception_handler
+    def get_transaction_block_by_hash(self,shard_index,hash:str):
+        method = "dx.transaction_block"
+        params = {}
+        params.update({"query_type":1})
+        params.update({"shard_index":shard_index})
+        params.update({"hash":hash})
+        response = self.make_request(method,params)
+        return AttributeDict(response)
     
     def get_transaction(self):
         pass 
