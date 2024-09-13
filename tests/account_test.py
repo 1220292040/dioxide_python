@@ -31,8 +31,23 @@ account2 = DioxAccount.from_key(test_sk_b64)
 print(account2)
 
 
-invalid_dapp = "ab"
-dapp = "abcd"
-dapp_address = DioxAddress(None,DioxAddressType.DAPP)
-if dapp_address.set_delegatee_from_string(dapp):
-    print(dapp_address)
+for d in ["ab","abcd","abcdefgha","asd_asf","ads@#sf"]:
+    dapp_address = DioxAddress(None,DioxAddressType.DAPP)
+    if dapp_address.set_delegatee_from_string(d):
+        print(dapp_address)
+    else:
+        print("invalid dapp:{}".format(d))
+
+for d in ["ab","abcd","abcdefgha","ABCD","Ab@A"]:
+    token_address = DioxAddress(None,DioxAddressType.TOKEN)
+    if token_address.set_delegatee_from_string(d):
+        print(token_address)
+    else:
+        print("invalid token:{}".format(d))
+
+for d in ["ab","abcd","abcdefgha"]:
+    name_address = DioxAddress(None,DioxAddressType.NAME)
+    if name_address.set_delegatee_from_string(d):
+        print(name_address)
+    else:
+        print("invalid name:{}".format(d))

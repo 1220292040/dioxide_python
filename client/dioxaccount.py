@@ -3,7 +3,7 @@ import ed25519
 import crc32c # type: ignore
 import krock32
 from enum import Enum
-from utils.gadget import get_length_recalculated
+import re
 
 class DioxAccountType(Enum):
     ED25519 = 0
@@ -33,19 +33,23 @@ class DioxAddress:
     def is_delegatee_name_valid(self,name:str):
         name_len_max = 0
         name_len_min = 0
-        char_set = ""
+        char_set = r''
         if self.__type == DioxAddressType.DAPP:
             name_len_min = 3
             name_len_max = 8
+            char_set = r'[a-z|A-Z|\d|_]+'
         elif self.__type == DioxAddressType.TOKEN:
             name_len_min = 3
             name_len_max = 8
+            char_set = r'[A-Z|\d|-|#]+'
         elif self.__type == DioxAddressType.NAME:
             name_len_min = 3
             name_len_max = 32
+            char_set = r'[\w\d|_|-|!|#|$|@|&|^|*|(|)|\[|\]|{|}|<|>|,|;|?|~]+'
         else:
             return False
-        if len(name)>name_len_max or len(name)<name_len_min or False:
+        
+        if len(name)>name_len_max or len(name)<name_len_min or re.fullmatch(char_set,name) is None:
             return False
         return True
 
@@ -72,12 +76,7 @@ class DioxAddress:
                     break
                 valid += 1
             addr = self.__address[0:valid]
-            if self.__type == DioxAddressType.DAPP:
-                return bytes(addr).decode() + ":dapp"
-            if self.__type == DioxAddressType.TOKEN:
-                return bytes(addr).decode() + ":token"
-            if self.__type == DioxAddressType.NAME:
-                return bytes(addr).decode() +":name"
+            return bytes(addr).decode() + ":" + self.__type.name.lower()
     
     @address.setter
     def address(self,address):
