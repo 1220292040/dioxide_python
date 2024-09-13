@@ -2,7 +2,7 @@
 import os,sys
 sys.path.append('.')
 
-from client.dioxaccount import DioxAccount,DioxAddress,DioxAddressType
+from client.account import DioxAccount,DioxAddress,DioxAddressType
 
 account0 = DioxAccount.generate_key_pair()
 print(account0)

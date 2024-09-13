@@ -4,13 +4,13 @@
   @date: 2024-09-12
 """
 
-class DioxUnsignedTransaction:
+class UnsignedTransaction:
     
     def __init__(self):
         pass
 
 
-class DioxTransaction:
+class Transaction:
 
     def __init__(self):
         pass

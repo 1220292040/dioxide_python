@@ -7,7 +7,7 @@ from client import clientlogger
 from client.stat import StatTool
 from client_config import Config
 from utils.rpc import HTTPProvide
-from client.dioxaccount import DioxAccount
+from client.account import DioxAccount
 from utils.gadget import exception_handler
 
 class DioxError(Exception):

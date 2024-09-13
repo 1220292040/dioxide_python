@@ -19,6 +19,7 @@ class DioxAddressType(Enum):
     DELEGATEE_OFFSET = 8
 
 #--------------------------------------------------------------------------------
+#TODO should impl account log?
 class DioxAddress:
     __address = None
     __type = DioxAddressType.DEFAULT

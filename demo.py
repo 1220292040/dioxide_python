@@ -1,6 +1,6 @@
 
 from client.dioxclient import DioxClient
-from client.dioxaccount import DioxAccount
+from client.account import DioxAccount
 print("start")
 client = DioxClient()
 # client.generate_key_pair()
