@@ -1,0 +1,17 @@
+allocate.address 10
+
+chain.deploy @0 bank.prd={_owner:"$@0$"}
+chain.deploy @0 controller.prd
+chain.deploy @0 ens.prd={_owner:"$@0$"}
+
+ENS.set_ens @0 {_cid:81606475777}
+Bank.set_authority @0 {_controller:"0x0000001300200001:contract"}
+chain.run
+
+ENS.invoke @1 {operation:"deposit",amount:1000}
+chain.run
+viz.addr @1
+
+ENS.invoke @1 {operation:"withdraw",amount:100}
+chain.run
+viz.addr @1

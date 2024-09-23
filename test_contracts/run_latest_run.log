@@ -1,0 +1,11 @@
+﻿Physical CPU core: 8, Logic CPU core: 16
+[PRD]: Chain initialized with 4 shard(s), in sync-sharding mode
+[PRD]: 12 addresses added and evenly distributed in shards
+[PRD]: Compiling 1 contract(s), target=PREDA_NATIVE
+[PRD]: Linking 1 contract(s), target=PREDA_NATIVE
+[PRD]: Compiling 1 contract(s), target=PREDA_NATIVE
+[PRD]: Linking 1 contract(s), target=PREDA_NATIVE
+[PRD]: [11:08:36.226] [#g] [h:1] Controller, line 5: controller id: 81606475777
+[PRD]: Compiling 1 contract(s), target=PREDA_NATIVE
+[PRD]: Linking 1 contract(s), target=PREDA_NATIVE
+[PRD]: [11:08:38.436] [#g] [h:2] ENS, line 10: ENS id:81607524353

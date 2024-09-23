@@ -1,0 +1,15 @@
+import Bank as bank;
+
+contract Controller {
+    @global function on_deploy(){
+        __debug.print("controller id: ",__id());
+    }
+
+    @address function deposit(uint32 amount) public{
+        bank.add(amount);
+    }
+    
+    @address function withdraw(uint32 amount) public{
+        bank.sub(amount);
+    }
+}

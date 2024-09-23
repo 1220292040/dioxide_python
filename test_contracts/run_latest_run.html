@@ -1,0 +1,225 @@
+﻿<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta http-equiv="X-UA-Compatible" content="IE=edge"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>run_latest_run</title><script>let BuildContext={args:"",contract:"run.prdts"}</script><script defer="defer" src="{{staticPath}}/main.js"></script><link href="{{staticPath}}/style.css" rel="stylesheet">
+<script type="text/javascript">
+var PREDA_VIZ_LOG = `
+[
+   {
+      "type": "Run",
+      "content": 
+      {
+         "script": "d:\\python_workspace\\dioxide_python_sdk\\test_contracts\\run.prdts",
+         "ShardOrder": 2
+      }
+   },
+   {
+      "type": "Deploy",
+      "content": 
+      {
+         "info": 
+         [
+            {
+               "contract": "Bank",
+               "engine": "PREDA_NATIVE",
+               "hash": "a0g33fsnpcsxd4vhp38xq2cnzd1ee9tb5y7mjcmdceyebzdyxvc0",
+               "finalized": false,
+               "ImplmentedInterfaces": [],
+               "StateVariables": 
+               [
+                  {"name": "owner", "scope": "global", "dataType": "address"},
+                  {"name": "controller", "scope": "global", "dataType": "address"},
+                  {"name": "balance", "scope": "address", "dataType": "uint32"}
+               ],
+               "Scopes": 
+               {
+                  "global": "HasState|HasFunction",
+                  "address": "HasState|HasFunction"
+               },
+               "ScatteredMaps": {},
+               "Structs": [],
+               "Enumerables": [],
+               "Interfaces": {},
+               "Functions": 
+               [
+                  {
+                     "name": "on_deploy",
+                     "flag": "InvokeBySystem|GlobalStateDependency",
+                     "scope": "global",
+                     "opcode": 0
+                  },
+                  {
+                     "name": "set_authority",
+                     "flag": "InvokeByNormalTransaction|EmitRelayInGlobalScope|GlobalStateDependency",
+                     "scope": "address",
+                     "opcode": 1
+                  },
+                  {
+                     "name": "get",
+                     "flag": "InvokeByNormalTransaction",
+                     "scope": "address",
+                     "opcode": 2
+                  },
+                  {
+                     "name": "add",
+                     "flag": "GlobalStateDependency",
+                     "scope": "address",
+                     "opcode": 3
+                  },
+                  {
+                     "name": "sub",
+                     "flag": "GlobalStateDependency",
+                     "scope": "address",
+                     "opcode": 4
+                  },
+                  {
+                     "name": "__relaylambda_5_set_authority",
+                     "flag": "InvokeByRelayTransaction|GlobalStateDependency",
+                     "scope": "global",
+                     "opcode": 5
+                  }
+               ]
+            }
+         ],
+         "sources": [{"contract": "Bank", "source": "bank.prd"}]
+      }
+   },
+   {
+      "type": "Deploy",
+      "content": 
+      {
+         "info": 
+         [
+            {
+               "contract": "Controller",
+               "engine": "PREDA_NATIVE",
+               "hash": "mzxdb1mx6x19fp5mfs003gapnmr560a83n5yd5jxkwp8f0xa0prg",
+               "finalized": false,
+               "ImplmentedInterfaces": [],
+               "StateVariables": [],
+               "Scopes": {"global": "HasFunction", "address": "HasFunction"},
+               "ScatteredMaps": {},
+               "Structs": [],
+               "Enumerables": [],
+               "Interfaces": {},
+               "Functions": 
+               [
+                  {
+                     "name": "on_deploy",
+                     "flag": "InvokeBySystem",
+                     "scope": "global",
+                     "opcode": 0
+                  },
+                  {
+                     "name": "deposit",
+                     "flag": "GlobalStateDependency",
+                     "scope": "address",
+                     "opcode": 1
+                  },
+                  {
+                     "name": "withdraw",
+                     "flag": "GlobalStateDependency",
+                     "scope": "address",
+                     "opcode": 2
+                  }
+               ]
+            }
+         ],
+         "sources": [{"contract": "Controller", "source": "controller.prd"}]
+      }
+   },
+   {
+      "type": "Deploy",
+      "content": 
+      {
+         "info": 
+         [
+            {
+               "contract": "ENS",
+               "engine": "PREDA_NATIVE",
+               "hash": "bw49m7yp3bvwr0hf18d7yhwjf2pgb4w44zgt3qvaeq6napx9a93g",
+               "finalized": false,
+               "ImplmentedInterfaces": [],
+               "StateVariables": 
+               [
+                  {"name": "owner", "scope": "global", "dataType": "address"},
+                  {"name": "cid", "scope": "global", "dataType": "uint64"}
+               ],
+               "Scopes": {"global": "HasState|HasFunction", "address": "HasFunction"},
+               "ScatteredMaps": {},
+               "Structs": [],
+               "Enumerables": [],
+               "Interfaces": {},
+               "Functions": 
+               [
+                  {
+                     "name": "on_deploy",
+                     "flag": "InvokeBySystem|GlobalStateDependency",
+                     "scope": "global",
+                     "opcode": 0
+                  },
+                  {
+                     "name": "set_ens",
+                     "flag": "InvokeByNormalTransaction|EmitRelayInGlobalScope|GlobalStateDependency",
+                     "scope": "address",
+                     "opcode": 1
+                  },
+                  {
+                     "name": "invoke",
+                     "flag": "InvokeByNormalTransaction|GlobalStateDependency",
+                     "scope": "address",
+                     "opcode": 2
+                  },
+                  {
+                     "name": "__relaylambda_3_set_ens",
+                     "flag": "InvokeByRelayTransaction|GlobalStateDependency",
+                     "scope": "global",
+                     "opcode": 3
+                  }
+               ]
+            }
+         ],
+         "sources": [{"contract": "ENS", "source": "ens.prd"}]
+      }
+   },
+   {
+      "type": "Addr",
+      "command": "viz.addr @1",
+      "content": 
+      [
+         {
+            "Address": "vffgwr07yq323axszgxbr2qp9azzbyjjm844s90z8ack63s6hrch683z48:ed25519",
+            "AddressIndex": "@1",
+            "ShardIndex": "#3",
+            "States": 
+            [
+               {
+                  "Contract": "Bank",
+                  "CVID": 81605427201,
+                  "State": {"balance": 1000}
+               }
+            ]
+         }
+      ]
+   },
+   {
+      "type": "Addr",
+      "command": "viz.addr @1",
+      "content": 
+      [
+         {
+            "Address": "vffgwr07yq323axszgxbr2qp9azzbyjjm844s90z8ack63s6hrch683z48:ed25519",
+            "AddressIndex": "@1",
+            "ShardIndex": "#3",
+            "States": 
+            [
+               {
+                  "Contract": "Bank",
+                  "CVID": 81605427201,
+                  "State": {"balance": 900}
+               }
+            ]
+         }
+      ]
+   }
+]`;
+</script>
+
+</head><body><script type="text/javascript">!function(){var n=document.createElement("style");var e,t,r=(e="{{staticPath}}",(t=document.createElement("textarea")).innerHTML=e,t.value);n.innerHTML=`\n        @font-face {\n          font-family: "inter-regular";\n          src: url(${r}/inter-regular.ttf);\n        }\n        @font-face {\n          font-family: "inter-bold";\n          src: url(${r}/inter-bold.ttf);\n        }\n        @font-face {\n          font-family: "menlo";\n          src: url(${r}/menlo-regular.ttf);\n        }\n      `,document.head.appendChild(n)}()</script><div id="root" class="wrap"></div></body></html>

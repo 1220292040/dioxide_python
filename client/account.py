@@ -5,6 +5,7 @@ import crc32c # type: ignore
 import krock32
 from enum import Enum
 import re
+from utils.gadget import calculate_txn_pow
 
 class DioxAccountType(Enum):
     ED25519 = 0
@@ -242,13 +243,27 @@ class DioxAccount:
         ret.update({"AddressType":self.account_type.name})
         return ret
 
-    def sign(self,msg):
+    def sign(self,msg:bytes):
         try:
             sk = ed25519.SigningKey(sk_s=self.__private_key)
             sig = sk.sign(msg)
         except:
             return None
         return sig
+
+    def sign_diox_transaction(self,txdata:bytes):
+        try:
+            sk = ed25519.SigningKey(sk_s=self.__private_key)
+            sig = sk.sign(txdata  +b'\x03' + self.__public_key)
+            signed_tx_data = txdata + b'\x03' + self.__public_key +  sig
+            # calculate txn pow
+            nonces:list[int] = calculate_txn_pow(signed_tx_data)
+            for nonce in nonces:
+                signed_tx_data = signed_tx_data + nonce.to_bytes(4,'little')
+            return signed_tx_data
+        except:
+            return None
+
 
     def verify(self,sig,msg):
         try:

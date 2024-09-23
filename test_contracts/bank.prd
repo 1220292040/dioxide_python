@@ -1,0 +1,31 @@
+contract Bank {
+    @global address owner;
+    @address uint32 balance;
+    @global address controller;
+
+    @global function on_deploy(address _owner){
+        owner = _owner;
+    }
+
+    @address function set_authority(address _controller) export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_controller) {
+            controller = _controller;
+        }
+    }
+
+    @address function uint32 get() public export{
+        return balance;
+    }
+    
+    @address function add(uint32 amount) public{
+        __debug.assert(__transaction.get_sender() == controller);
+        balance += amount;
+    }
+
+    @address function sub(uint32 amount) public{
+        __debug.assert(__transaction.get_sender() == controller);
+        __debug.assert(amount <= balance);
+        balance -= amount;
+    }
+}
