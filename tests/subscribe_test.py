@@ -1,9 +1,37 @@
-import os,sys
+import os,sys,time,threading
 sys.path.append('.')
-
-import asyncio
 from client.dioxclient import DioxClient
 
+def handler(r):
+    print(r)
+
+def filter1(r):
+    if r["Height"] > 10 and r["Height"]<20:
+        return True
+    else:
+        return False
+
+def filter2(r):
+    if r["Height"] > 20:
+        return True
+    else:
+        return False
 
 client = DioxClient()
-asyncio.get_event_loop().run_until_complete(client.subscribe("transaction_block"))
+
+
+threads = []
+for topic in ["consensus_header", "transaction_block"]:
+    t = threading.Thread(target=client.subscribe, args=(topic, handler, None))
+    threads.append(t)
+    t.start()
+
+start = time.time()
+
+while True:
+    print("main thread => pause...")
+    time.sleep(1)
+    if time.time() - start > 10:
+        client.unsubscribe(threads[1].ident)
+
+

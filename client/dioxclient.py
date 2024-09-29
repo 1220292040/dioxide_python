@@ -3,20 +3,21 @@
   @author: long
   @date: 2024-09-12
 """  
-import aiowebsocket.converses
 from client import clientlogger
 from client.stat import StatTool
 from client_config import Config
 from utils.rpc import HTTPProvide
-from client.account import DioxAccount
-from utils.gadget import exception_handler
+from client.account import DioxAccount,DioxAddress,DioxAddressType
+from utils.gadget import exception_handler,get_subscribe_message
 from attributedict.collections import AttributeDict
 import base64
 import time
 import json
 from client.contract import Scope
-import os 
+import os,threading
 import websockets
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 
 class DioxError(Exception):
@@ -33,11 +34,19 @@ class DioxClient:
     rpc = None
     logger = clientlogger.client_logger
     ws_rpc = None
+    ws_connections = None
 
     def __init__(self):
         self.rpc = HTTPProvide(url=Config.rpc_url)
         self.rpc.logger = self.logger
         self.ws_rpc = Config.ws_rpc
+        self.ws_connections = {}
+        self.loop = asyncio.new_event_loop() 
+        threading.Thread(target=self.__start_loop, daemon=True).start()
+
+    def __start_loop(self):
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
 
     def get_client_version(self):
         info = "url:{}\n".format(Config.url)
@@ -192,7 +201,7 @@ class DioxClient:
         return AttributeDict(response)
 
     @exception_handler
-    def deploy_contract(self,dapp_address,delegatee:DioxAccount,file_path=None,source_code=None,construct_args:dict=None,timeout=None,sync=False):
+    def deploy_contract(self,dapp_name,delegatee:DioxAccount,file_path=None,source_code=None,construct_args:dict=None,timeout=None,sync=False):
         deploy_args={}
         if file_path is not None:
             with open(file_path) as f:
@@ -205,6 +214,8 @@ class DioxClient:
         deploy_args.update({"cargs":[json.dumps(construct_args)]})
         if timeout is not None:
             deploy_args.update({"timeout":timeout})
+        dapp_address = DioxAddress(None,DioxAddressType.DAPP)
+        dapp_address.set_delegatee_from_string(dapp_name)
         deployed_txn = self.compose_transaction(
             sender=dapp_address,
             function="core.delegation.deploy_contracts",
@@ -215,12 +226,12 @@ class DioxClient:
         return tx_hash
     
     @exception_handler
-    def deploy_contracts(self,dapp_address,delegatee:DioxAccount,dir_path=None,suffix=".prd",construct_args:list[dict]=None,timeout=None,sync=False):
+    def deploy_contracts(self,dapp_name,delegatee:DioxAccount,dir_path=None,suffix=".prd",construct_args:list[dict]=None,timeout=None,sync=False):
         deploy_args={}
         codes = []
         cargs = []
         print(dir_path)
-        for filepath,dirnames,filenames in os.walk(dir_path):
+        for filepath,_,filenames in os.walk(dir_path):
             for filename in filenames:
                 if os.path.splitext(filename)[-1] == suffix:
                     with open(os.path.join(filepath,filename)) as f:
@@ -234,6 +245,8 @@ class DioxClient:
         deploy_args.update({"cargs":cargs})
         if timeout is not None:
             deploy_args.update({"timeout":timeout})
+        dapp_address = DioxAddress(None,DioxAddressType.DAPP)
+        dapp_address.set_delegatee_from_string(dapp_name)
         deployed_txn = self.compose_transaction(
             sender=dapp_address,
             function="core.delegation.deploy_contracts",
@@ -260,52 +273,33 @@ class DioxClient:
         return AttributeDict(response)
 
     #if overflow tcp buffer, consider use message queue
-    #filter to impl
     @exception_handler
-    async def subscribe(self,topic:str,filter=None):
-        async with websockets.connect(self.ws_rpc,ping_interval=None) as ws:
-            if topic == "consensus_header":
-                await self.__subscribe_consensus_header(ws,filter)
-            elif topic == "transaction_block":
-                await self.__subscribe_transaction_block(ws,filter)
-            elif topic == "transaction":
-                await self.__subscribe_transaction(ws,filter)
-            elif topic == "state":
-                await self.__subscribe_state_update(ws,filter)
-            else:
-                raise DioxError(-10002,"error type")
-            
-    
-    async def __subscribe_consensus_header(self,ws,filter):
-        await ws.send(json.dumps({"req":"subscribe.master_commit_head"}))
-        while True:
-                resp = await ws.recv()
-                print(resp)
-
-    async def __subscribe_transaction_block(self,ws,filter):
-        await ws.send(json.dumps({"req":"subscribe.block_commit_on_head"}))
-        while True:
-                resp = await ws.recv()
-                print(resp)
-
-    async def __subscribe_transaction(self,ws,filter):
-        await ws.send(json.dumps({"req":"subscribe.txn_confirm_on_head"}))
-        while True:
-                resp = await ws.recv()
-                print(resp)
-
-    async def __subscribe_state_update(self,ws,filter):
-        await ws.send(json.dumps({"req":"subscribe.state_update"}))
-        while True:
-                resp = await ws.recv()
-                print(resp)
-
-
+    def subscribe(self,topic:str,handler,filter=None):
+        thread_id = threading.get_ident()
+        asyncio.set_event_loop(self.loop)
+        asyncio.run_coroutine_threadsafe(self.__subscribe(topic,thread_id, handler, filter),self.loop)
 
     @exception_handler
-    def unsubscribe(self):
-        pass
-    
+    def unsubscribe(self,thread_id):
+        ws = self.ws_connections.get(thread_id)
+        if ws is not None:
+            asyncio.run_coroutine_threadsafe(self.__unsubscribe(ws, thread_id),self.loop)
+
+    async def __subscribe(self,topic:str,thread_id,handler,filter=None):
+        executor = ThreadPoolExecutor(max_workers=Config.default_thread_nums)
+        ws = await websockets.connect(self.ws_rpc, ping_interval=None)
+        self.ws_connections[thread_id] = ws
+        msg = get_subscribe_message(topic)
+        await ws.send(msg)
+        while ws in self.ws_connections.values():
+            resp = json.loads(await ws.recv())  
+            if (handler is not None) and (filter is None or filter(resp)):
+                executor.submit(handler,resp)
+
+    async def __unsubscribe(self, ws, thread_id):
+        await ws.close()
+        self.ws_connections.pop(thread_id, None)
+
     
     #wrapper method ----------------------------------------------------------------
     @exception_handler

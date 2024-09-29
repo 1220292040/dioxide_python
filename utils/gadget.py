@@ -1,4 +1,4 @@
-import hashlib
+import hashlib,json
 
 def exception_handler(func):
     def wrapper(*args, **kwargs):
@@ -64,3 +64,18 @@ def calculate_txn_pow(tx):
         nonce += 1
 
     return nonces
+
+
+def get_subscribe_message(topic: str):
+    if topic == "consensus_header":
+        return json.dumps({"req": "subscribe.master_commit_head"})
+    elif topic == "transaction_block":
+        return json.dumps({"req": "subscribe.block_commit_on_head"})
+    elif topic == "transaction":
+        return json.dumps({"req": "subscribe.txn_confirm_on_head"})
+    elif topic == "state":
+        return json.dumps({"req": "subscribe.state_update"})
+    elif topic == "relays":
+        return json.dumps({"req": "subscribe.txn_emit_on_head"})
+    else:
+        raise ValueError("Invalid topic type")
