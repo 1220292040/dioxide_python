@@ -7,6 +7,7 @@ import time
 import struct
 from client import contract
 
+
 class UnsignedTransaction:
     chain_version = None
     pack_flag = 0

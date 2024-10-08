@@ -79,3 +79,7 @@ def get_subscribe_message(topic: str):
         return json.dumps({"req": "subscribe.txn_emit_on_head"})
     else:
         raise ValueError("Invalid topic type")
+    
+
+def title_info(msg):
+    print("#######################{}################".format(msg))
