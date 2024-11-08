@@ -10,6 +10,8 @@ from utils.rpc import HTTPProvide
 from client.account import DioxAccount,DioxAddress,DioxAddressType
 from utils.gadget import exception_handler,get_subscribe_message
 from attributedict.collections import AttributeDict
+import client.types as dioxtypes
+import queue
 import base64
 import time
 import json
@@ -19,6 +21,8 @@ import websockets
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
+
+DEFAULT_TIMEOUT = 30
 
 class DioxError(Exception):
     code = None
@@ -280,7 +284,7 @@ class DioxClient:
     @params:
         shard_index:分片序号
         height: 高度
-    @response:
+    @response -- object:
         同上
     """
     @exception_handler
@@ -298,7 +302,7 @@ class DioxClient:
         根据交易哈希获取交易
     @params:
         hash:交易哈希
-    @response:
+    @response -- object:
         Hash: 交易哈希,
         GasOffered: 交易的gaslimit,
         GasPrice": 交易的gasprice,
@@ -323,6 +327,21 @@ class DioxClient:
         response = self.make_request(method,params)
         return AttributeDict(response)
     
+    """
+    @description:
+        合成交易,将交易的各字段合成成字节流形式,后续加入签名后发送到链上
+    @params:
+        sender: 发送者
+        function: 调用的合约函数(<dapp>.<contract>.<function>)
+        args: 函数调用参数,object
+        isn: 交易isn,不填默认为最新isn,同以太坊nonce
+        is_delegatee: 是否是委托交易
+        gas_price: 设置交易gas_price
+        gas_limit: 设置交易gas_limit
+    @response -- bytes
+        合成的交易base64编码
+        
+    """
     @exception_handler
     def compose_transaction(self,sender,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,gas_price=None,gas_limit=None):
         method = "tx.compose"
@@ -341,36 +360,72 @@ class DioxClient:
             params.update({"isn":isn})
         if tokens is not None:
             params.update({"tokens":tokens})
-        print(params)
         response = self.make_request(method,params)
         return base64.b64decode(response["TxData"])
 
+    """
+    @description:
+        发送签名后的交易
+    @params:
+        signed_txn: 签名后的交易字节流
+        sync: 是否同步等待返回结果
+        timeout: 超时时间
+    @response -- str
+        交易哈希(base32编码)
+    """
     @exception_handler
-    def send_raw_transaction(self,signed_txn:bytes,sync=False,timeout=10):
+    def send_raw_transaction(self,signed_txn:bytes,sync=False,timeout=DEFAULT_TIMEOUT):
         method = "tx.send"
         params = {"txdata":base64.b64encode(signed_txn).decode()}
         response = self.make_request(method,params)
         tx_hash = response["Hash"]
         if sync:
-            now = time.time()
-            while int(time.time()-now)<timeout:
-                tx = self.get_transaction(tx_hash)
-                if tx.ConfirmState != "TXN_READY":
-                    return tx_hash
-                time.sleep(1)
-            raise DioxError(-10000, "timeout")
+            if self.wait_for_transaction_confirmed(tx_hash,timeout):
+                return tx_hash
+            else:
+                raise DioxError(-10000, "timeout")
         return tx_hash
 
 
+    """
+    @description:
+        根据合约名称获取合约详细信息(类似abi)
+    @params:
+        dapp_name: dapp名称
+        contract_name: 合约名称
+    @response -- object
+        ContractID: 合约ID(唯一),
+        ContractVersionID: 合约ID+合约版本号,
+        Contract": 合约名称,
+        Hash: 合约内容哈希值,
+        ImplmentedInterfaces: 合约实现的接口,
+        StateVariables: 合约变量([{'name':<变量名称>,'scope':<变量所属scope>,'dataType':<变量类型>}...]),
+        Scopes: 合约中所有的scope,
+        Interfaces: 合约定义的接口,
+        Functions: 合约定义的所有函数
+    """
     @exception_handler
-    def get_contract_info(self,dapp,contract_name):
+    def get_contract_info(self,dapp_name,contract_name):
         method = "dx.contract_info"
-        params = {"contract":"{}.{}".format(dapp,contract_name)}
+        params = {"contract":"{}.{}".format(dapp_name,contract_name)}
         response = self.make_request(method,params)
         return AttributeDict(response)
 
+    """
+    @description:
+        部署合约
+    @params:
+        dapp_name: dapp名称
+        delegator: dapp的所有者,签名账户
+        file_path: 合约文件路径,需要.prd文件
+        source_code: 如果不指定合约文件路径则需要直接给出源码
+        construct_args: 合约构造函数,object
+        compile_time: 合约最长的编译时间,一般不设置
+    @response -- str
+        合约部署交易哈希
+    """
     @exception_handler
-    def deploy_contract(self,dapp_name,delegatee:DioxAccount,file_path=None,source_code=None,construct_args:dict=None,timeout=None,sync=False):
+    def deploy_contract(self,dapp_name,delegator:DioxAccount,file_path=None,source_code=None,construct_args:dict=None,compile_time=None):
         deploy_args={}
         if file_path is not None:
             with open(file_path) as f:
@@ -381,25 +436,38 @@ class DioxClient:
             else:
                 deploy_args.update({"code":[source_code]})
         deploy_args.update({"cargs":[json.dumps(construct_args)]})
-        if timeout is not None:
-            deploy_args.update({"timeout":timeout})
+        if compile_time is not None:
+            deploy_args.update({"timeout":compile_time})
         dapp_address = DioxAddress(None,DioxAddressType.DAPP)
-        dapp_address.set_delegatee_from_string(dapp_name)
+        if not dapp_address.set_delegatee_from_string(dapp_name):
+            raise DioxError(-10002, "invalid dapp name") 
         deployed_txn = self.compose_transaction(
-            sender=dapp_address,
+            sender=dapp_address.address,
             function="core.delegation.deploy_contracts",
             args=deploy_args,
             is_delegatee=True
         )
-        tx_hash = self.send_raw_transaction(delegatee.sign_diox_transaction(deployed_txn))
+        tx_hash = self.send_raw_transaction(delegator.sign_diox_transaction(deployed_txn))
         return tx_hash
     
+    """
+    @description:
+        批量部署合约
+    @params:
+        dapp_name: dapp名称
+        delegator: dapp的所有者,签名账户
+        dir_path: 合约文件夹路径
+        suffix: 合约文件后缀,默认部署该文件夹下所有.prd文件
+        construct_args: 合约构造函数,list[object]
+        compile_time: 合约最长的编译时间,一般不设置
+    @response -- str
+        合约部署交易哈希
+    """
     @exception_handler
-    def deploy_contracts(self,dapp_name,delegatee:DioxAccount,dir_path=None,suffix=".prd",construct_args:list[dict]=None,timeout=None,sync=False):
+    def deploy_contracts(self,dapp_name,delegator:DioxAccount,dir_path=None,suffix=".prd",construct_args:list[dict]=None,compile_time=None):
         deploy_args={}
         codes = []
         cargs = []
-        print(dir_path)
         for filepath,_,filenames in os.walk(dir_path):
             for filename in filenames:
                 if os.path.splitext(filename)[-1] == suffix:
@@ -412,28 +480,46 @@ class DioxClient:
                 cargs.append(json.dumps(carg))
         deploy_args.update({"code":codes})
         deploy_args.update({"cargs":cargs})
-        if timeout is not None:
-            deploy_args.update({"timeout":timeout})
+        if compile_time is not None:
+            deploy_args.update({"timeout":compile_time})
         dapp_address = DioxAddress(None,DioxAddressType.DAPP)
-        dapp_address.set_delegatee_from_string(dapp_name)
+        if not dapp_address.set_delegatee_from_string(dapp_name):
+            raise DioxError(-10002, "invalid dapp name") 
         deployed_txn = self.compose_transaction(
-            sender=dapp_address,
+            sender=dapp_address.address,
             function="core.delegation.deploy_contracts",
             args=deploy_args,
             is_delegatee=True
         )
-        tx_hash = self.send_raw_transaction(delegatee.sign_diox_transaction(deployed_txn))
+        tx_hash = self.send_raw_transaction(delegator.sign_diox_transaction(deployed_txn))
         return tx_hash
 
+    """
+    @description:
+        获取合约状态信息
+    @params:
+        contract_with_scope: 想要获取的状态变量scope,可选值有(global | shard | address | uint32 | uint64 | uint128 | uint256| uint512)
+        scope_key: scope对应的key,比如scope是address,则该字段对应的是一个地址,如果是global,该字段为空
+    @response -- object
+        状态object
+    """
     @exception_handler
-    def get_contract_state(self,dapp,contract_name,scope:Scope,key):
+    def get_contract_state(self,dapp_name,contract_name,scope:Scope,key):
         method = "dx.contract_state"
-        params = {"contract_with_scope":str(dapp)+"."+str(contract_name)+"."+scope.name.lower()}
+        params = {"contract_with_scope":str(dapp_name)+"."+str(contract_name)+"."+scope.name.lower()}
         if scope.value != scope.Global:
             params.update({"scope_key":key})
         response = self.make_request(method,params)
         return AttributeDict(response)
 
+    """
+    @description:
+        获取dapp信息
+    @params:
+        dapp_name: dapp名称
+    @response -- object
+        DappID: dapp对应的dappid
+    """
     @exception_handler
     def get_dapp_info(self,dapp_name):
         method = "dx.dapp"
@@ -472,40 +558,22 @@ class DioxClient:
     
     #wrapper method ----------------------------------------------------------------
     @exception_handler
-    def wait_success(self,type:str,token:str,timeout = 10):
-        now = time.time()
-        if type == "dapp":
-            while int(time.time()-now)<timeout:
-                if self.get_dapp_info(token) is not None:
-                    return True
-                time.sleep(1)
-            return False
-        elif type == "contract":
-            while int(time.time()-now)<timeout:
-                if self.get_contract_info(token) is not None:
-                    return True
-                time.sleep(1)
-            return False
-        else:
-            return True
-
-    @exception_handler
-    def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,gas_price=None,gas_limit=None,is_sync=True):
+    def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,gas_price=None,gas_limit=None,is_sync=False,timeout=DEFAULT_TIMEOUT):
         unsigned_txn = self.compose_transaction(sender=user.address,
                                           function=function,
                                           args=args
                                         )
         signed_txn = user.sign_diox_transaction(unsigned_txn)
-        tx_hash = self.send_raw_transaction(signed_txn,is_sync)
+        tx_hash = self.send_raw_transaction(signed_txn,is_sync,timeout)
         return tx_hash
     
     @exception_handler
-    def mint_dio(self,user:DioxAccount,amount,sync=True):
-        tx_hash = self.send_transaction(user=user,function="core.coin.mint",args={"Amount":"{}".format(amount)},is_sync=sync)
+    def mint_dio(self,user:DioxAccount,amount,sync=True,timeout=DEFAULT_TIMEOUT):
+        tx_hash = self.send_transaction(user=user,function="core.coin.mint",args={"Amount":"{}".format(amount)},is_sync=sync,timeout=timeout)
         return tx_hash
 
     @exception_handler
-    def create_dapp(self,user:DioxAccount,dapp_name,deposit_amount,sync=True):
+    def create_dapp(self,user:DioxAccount,dapp_name,deposit_amount,sync=True,timeout=DEFAULT_TIMEOUT):
         tx_hash = self.send_transaction(
             user=user,
             function="core.delegation.create",
@@ -516,5 +584,65 @@ class DioxClient:
             },
             is_sync=sync
         )
-        ok = self.wait_success("dapp",dapp_name)
+        if sync:
+            ok = self.wait_for_dapp_deployed(tx_hash,timeout)
+        else:
+            ok = None
         return tx_hash,ok
+    
+    #aux method ----------------------------------------------------------------
+    def tx_confirmed(self,tx):
+        if tx is None or tx.get("ConfirmState",None) is None :
+            return False
+        return tx.ConfirmState in dioxtypes.TXN_CONFIRMED_STATUS
+    
+    def wait_for_tx_confirmed_with_relays(self,tx):
+        q = queue.Queue()
+        q.put(tx.Hash)
+        while not q.empty():
+            cur_tx = self.get_transaction(q.get())
+            if not self.tx_confirmed(cur_tx):
+                return False
+            for relay_tx_hash in cur_tx.Invocation.get("Relays",[]):
+                q.put(relay_tx_hash)
+        return True
+
+    def get_all_relay_transactions(self,tx,detail=False):
+        res = []
+        if self.wait_for_tx_confirmed_with_relays(tx):
+            q = queue.Queue()
+            q.put(tx)
+            while not q.empty():
+                for h in q.get().Invocation.get("Relays",[]):
+                    res.append(self.get_transaction(h) if detail is True else h)
+                    q.put(self.get_transaction(h))
+            return res
+        else:
+            return None
+    
+    def wait_for_transaction_confirmed(self,tx_hash,timeout):
+        start = time.time()
+        tx = self.get_transaction(tx_hash)
+        while not self.wait_for_tx_confirmed_with_relays(tx):
+            if time.time() - start > timeout:
+                return False
+            time.sleep(1)
+        return True
+    
+    def wait_for_dapp_deployed(self,tx_hash,timeout):
+        if self.wait_for_transaction_confirmed(tx_hash,timeout):
+            relays = self.get_all_relay_transactions(self.get_transaction(tx_hash),detail=True)
+            for relay in relays:
+                if relay.Function == 'core.coin.address.deposit':
+                    return False
+            return True
+        else:
+            return False
+
+    def wait_for_contract_deployed(self,dapp_name,contract_name,timeout=DEFAULT_TIMEOUT):
+        start = time.time()
+        print(self.get_contract_info(dapp_name,contract_name))
+        while not self.get_contract_info(dapp_name,contract_name):
+            if time.time() - start > timeout:
+                return False
+            time.sleep(1)

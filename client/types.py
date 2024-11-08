@@ -1,6 +1,7 @@
 
 
 from enum import Enum
+import queue 
 
 GLOBAL_IDENTIFIER = 65535
 
@@ -37,3 +38,18 @@ class BlkArchiveState(Enum):
 	BLKAS_DISCARD = 1,			# for orphaned
 	BLKAS_ARCHIVING = 2,		# block is added to archive queue
 	BLKAS_ARCHIVED = 3			# all data of the block (body, txn, txnids) are saved to db, for uncle only body is saved
+
+
+class TxnConfirmState(Enum):
+	TXN_RELAY_INVALIDED = -3,		# when its originate block is forked
+	TXN_READY = 0,					# ready to be confirmed (forward broadcast allowed since then)
+	TXN_CONFIRMED = 1,				# at least one block confirmed the txn, which enters MemoryPool::_TxnConfirmedMap
+	TXN_FINALIZED = 2,				# confirmed by a block which is finalized
+	TXN_ABORTED = 3,				# duplicated ISN that another one is confirmed and finalized (normal txn only)
+	TXN_EXPIRED = 4,				# when its expiration time < latest finalized block time (normal txn only)
+	TXN_ARCHIVED = 5,				# saved to DB after TXN_FINALIZED
+
+
+TXN_CONFIRMED_STATUS = [TxnConfirmState.TXN_ARCHIVED.name,TxnConfirmState.TXN_CONFIRMED.name,TxnConfirmState.TXN_FINALIZED.name]
+TXN_FINALIZED_STATUS = [TxnConfirmState.TXN_ARCHIVED.name,TxnConfirmState.TXN_FINALIZED.name]
+TXN_ARCHIVED_STATUS = [TxnConfirmState.TXN_ARCHIVED.name]

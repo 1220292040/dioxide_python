@@ -3,6 +3,7 @@ sys.path.append('.')
 
 from client.dioxclient import DioxClient
 from client.account import DioxAccount
+import base64
 
 client = DioxClient()
 
@@ -13,12 +14,13 @@ unsigned_txn = client.compose_transaction(sender=tester.address,
                                           function="core.coin.mint",
                                           args={"Amount":"10000000000000000000000000000000000000000000000000"}
                                         )
-print(unsigned_txn,"len:",len(unsigned_txn))
+
+print(base64.b64encode(unsigned_txn),"len:",len(unsigned_txn))
 
 signed_txn = tester.sign_diox_transaction(unsigned_txn)
-print(signed_txn,"len:",len(signed_txn))
+print(base64.b64encode(signed_txn),"len:",len(signed_txn))
 
-tx_hash = client.send_raw_transaction(signed_txn,sync=True)
+tx_hash = client.send_raw_transaction(signed_txn,sync=True,timeout=30)
 print(tx_hash)
 
 tx = client.get_transaction(tx_hash)

@@ -43,7 +43,7 @@ class PowDifficulty:
 
 def get_pow_difficulty(tx_size):
     pow_diff = PowDifficulty()
-    denominator = (1000 + tx_size * (2 * 10 + 100)) // 3
+    denominator = (1000 + tx_size * (30 * 10 + 100)) // 3
     pow_diff.set(denominator)
     return pow_diff
 
