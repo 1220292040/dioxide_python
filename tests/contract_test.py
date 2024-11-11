@@ -31,7 +31,6 @@ if ok:
     ]
     print(client.deploy_contracts(dapp_name=dapp_name,delegator=tester,dir_path="./test_contracts",construct_args=constructors))
     client.wait_for_contract_deployed(dapp_name,bank_contract_name)
-    client.wait_for_contract_deployed(dapp_name,ens_contract_name)
     print("deploy success")
 else:
     print("error")

@@ -527,6 +527,21 @@ class DioxClient:
         response = self.make_request(method,params)
         return AttributeDict(response)
 
+    """
+    @description:
+        获取token信息
+    @params:
+        token_symbol: token名称(全大写)
+    @response -- object
+        TokenId: Token对应的id
+    """
+    @exception_handler
+    def get_token_info(self,token_symbol):
+        method = "dx.token"
+        params = {"symbol":"{}".format(token_symbol)}
+        response = self.make_request(method,params)
+        return AttributeDict(response)
+
     #if overflow tcp buffer, consider use message queue
     @exception_handler
     def subscribe(self,topic:str,handler,filter=None):
@@ -573,6 +588,16 @@ class DioxClient:
         return tx_hash
 
     @exception_handler
+    def transfer(self,sender:DioxAccount,receiver,amount,token="DIO",sync=True,timeout=DEFAULT_TIMEOUT):
+        args = {
+            "To":"{}".format(receiver),
+            "Amount":"{}".format(amount),
+            "token":"{}".format(token)
+        }
+        tx_hash = self.send_transaction(user=sender,function="core.wallet.transfer",args=args,is_sync=sync,timeout=timeout)
+        return tx_hash
+
+    @exception_handler
     def create_dapp(self,user:DioxAccount,dapp_name,deposit_amount,sync=True,timeout=DEFAULT_TIMEOUT):
         tx_hash = self.send_transaction(
             user=user,
@@ -590,6 +615,44 @@ class DioxClient:
             ok = None
         return tx_hash,ok
     
+    """
+    @description:
+        创建token
+    @params:
+        @Minter: 发币合约的CID,没有minter或者后续再设置minter填0
+        @MinterFlags: 0-不允许该合约发币(临时性),1-允许该合约发币(临时性),2-不允许该合约发币(永久性),3-允许该合约发币(永久性)
+        @TokenFlags: 0:可以后续设置minter,1不可以后续设置minter
+        @Symbol: 代币名称,全大写,长度3-8
+        @InitSupply:初始发行量
+        @Deposit: 这个代币初始存入的dio数量
+    @response -- object
+        状态object
+    @TBD.这些flag换成枚举变量
+    """
+    @exception_handler
+    def create_token(self,user:DioxAccount,symbol,initial_supply,deposit,decimals,cid=0,minter_flag=1,token_flag=0,sync=True,timeout=DEFAULT_TIMEOUT):
+        tx_hash = self.send_transaction(
+            user=user,
+            function="core.delegation.create_token",
+            args={
+                "Minter":cid,
+                "MinterFlags":minter_flag,
+                "TokenStates":token_flag,
+                "Symbol":"{}".format(symbol),
+                "InitSupply":"{}".format(initial_supply),
+                "Deposit":"{}".format(deposit),
+                "Decimals":decimals
+            },
+            is_sync=sync
+        )
+        if sync:
+            ok = self.wait_for_token_deployed(tx_hash,timeout)
+        else:
+            ok = None
+        return tx_hash,ok
+    
+
+
     #aux method ----------------------------------------------------------------
     def tx_confirmed(self,tx):
         if tx is None or tx.get("ConfirmState",None) is None :
@@ -630,6 +693,16 @@ class DioxClient:
         return True
     
     def wait_for_dapp_deployed(self,tx_hash,timeout):
+        if self.wait_for_transaction_confirmed(tx_hash,timeout):
+            relays = self.get_all_relay_transactions(self.get_transaction(tx_hash),detail=True)
+            for relay in relays:
+                if relay.Function == 'core.coin.address.deposit':
+                    return False
+            return True
+        else:
+            return False
+
+    def wait_for_token_deployed(self,tx_hash,timeout):
         if self.wait_for_transaction_confirmed(tx_hash,timeout):
             relays = self.get_all_relay_transactions(self.get_transaction(tx_hash),detail=True)
             for relay in relays:

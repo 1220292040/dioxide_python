@@ -25,3 +25,9 @@ print(tx_hash)
 
 tx = client.get_transaction(tx_hash)
 print(tx)
+
+token_symbol = "ABNC"
+h = client.create_token(tester,"{}".format(token_symbol),"10000","100000000",10)
+print(h)
+
+print(client.get_token_info(token_symbol))
