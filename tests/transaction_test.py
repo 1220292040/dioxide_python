@@ -12,8 +12,9 @@ print(tester.address)
 
 unsigned_txn = client.compose_transaction(sender=tester.address,
                                           function="core.coin.mint",
-                                          args={"Amount":"10000000000000000000000000000000000000000000000000"}
-                                        )
+                                          args={"Amount":"10000000000000000000000000000000000000000000000000"},
+                                          ttl=100
+                                          )
 
 print(base64.b64encode(unsigned_txn),"len:",len(unsigned_txn))
 

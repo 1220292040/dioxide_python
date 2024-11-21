@@ -22,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
 
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 60
 
 class DioxError(Exception):
     code = None
@@ -343,7 +343,7 @@ class DioxClient:
         
     """
     @exception_handler
-    def compose_transaction(self,sender,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,gas_price=None,gas_limit=None):
+    def compose_transaction(self,sender,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,gas_price=None,gas_limit=None,ttl=None):
         method = "tx.compose"
         params = {}
         params.update({"function":function})
@@ -360,6 +360,8 @@ class DioxClient:
             params.update({"isn":isn})
         if tokens is not None:
             params.update({"tokens":tokens})
+        if ttl is not None:
+            params.update({"ttl":ttl})
         response = self.make_request(method,params)
         return base64.b64decode(response["TxData"])
 
@@ -714,8 +716,8 @@ class DioxClient:
 
     def wait_for_contract_deployed(self,dapp_name,contract_name,timeout=DEFAULT_TIMEOUT):
         start = time.time()
-        print(self.get_contract_info(dapp_name,contract_name))
         while not self.get_contract_info(dapp_name,contract_name):
             if time.time() - start > timeout:
                 return False
             time.sleep(1)
+        return True

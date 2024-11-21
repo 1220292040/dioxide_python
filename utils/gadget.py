@@ -41,16 +41,20 @@ class PowDifficulty:
         return True
 
 
-def get_pow_difficulty(tx_size):
+def get_ttl_from_signed_txn(tx):
+    ttl_sc_tsc = int.from_bytes(tx[12:14],'little')
+    return 1 + (ttl_sc_tsc & 0x01ff)
+
+def get_pow_difficulty(tx_size,ttl=30):
     pow_diff = PowDifficulty()
-    denominator = (1000 + tx_size * (30 * 10 + 100)) // 3
+    denominator = (1000 + tx_size * (ttl * 10 + 100)) // 3
     pow_diff.set(denominator)
     return pow_diff
 
 def calculate_txn_pow(tx):
     pow_data = hashlib.sha512(tx).digest()[0:-4]
     nonces = [0] * 3
-    diff = get_pow_difficulty(len(tx)+12)
+    diff = get_pow_difficulty(len(tx)+12,get_ttl_from_signed_txn(tx))
 
     nonce = 0
     for i in range(3):

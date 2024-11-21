@@ -8,17 +8,28 @@ import re
 from utils.gadget import calculate_txn_pow
 
 class DioxAccountType(Enum):
-    ED25519 = 0
     ETHEREUM = 1
-    SM2 = 2
-    END = 3
+    BITCOIN_P2PKH = 2
+    ED25519 = 3
+    SM2 = 4
+    END = 5
 
 class DioxAddressType(Enum):
     DEFAULT = 0
-    NAME = 1
-    DAPP = 2
-    TOKEN = 3
-    DELEGATEE_OFFSET = 8
+    HASH = 8
+    NAME = 9
+    DAPP = 10
+    TOKEN = 11
+
+
+class SecSuiteParam(Enum):
+	DELEGATED_HASH_SIZE	= 32
+	DELEGATED_NAME_SIZEMIN = 3
+	DELEGATED_NAME_SIZEMAX = 32
+	DELEGATED_DAPP_SIZEMIN = 4
+	DELEGATED_DAPP_SIZEMAX = 8
+	DELEGATED_TOKEN_SIZEMIN = 3
+	DELEGATED_TOKEN_SIZEMAX = 8
 
 #--------------------------------------------------------------------------------
 #TODO should impl account log?
@@ -49,16 +60,16 @@ class DioxAddress:
         name_len_min = 0
         char_set = r''
         if self.__type == DioxAddressType.DAPP:
-            name_len_min = 3
-            name_len_max = 8
+            name_len_min = SecSuiteParam.DELEGATED_DAPP_SIZEMIN.value
+            name_len_max = SecSuiteParam.DELEGATED_DAPP_SIZEMAX.value
             char_set = r'[a-z|A-Z|\d|_]+'
         elif self.__type == DioxAddressType.TOKEN:
-            name_len_min = 3
-            name_len_max = 8
+            name_len_min = SecSuiteParam.DELEGATED_TOKEN_SIZEMIN.value
+            name_len_max = SecSuiteParam.DELEGATED_TOKEN_SIZEMAX.value
             char_set = r'[A-Z|\d|-|#]+'
         elif self.__type == DioxAddressType.NAME:
-            name_len_min = 3
-            name_len_max = 32
+            name_len_min = SecSuiteParam.DELEGATED_NAME_SIZEMIN.value
+            name_len_max = SecSuiteParam.DELEGATED_NAME_SIZEMIN.value
             char_set = r'[\w\d|_|-|!|#|$|@|&|^|*|(|)|\[|\]|{|}|<|>|,|;|?|~]+'
         else:
             return False
@@ -69,7 +80,7 @@ class DioxAddress:
     def set_delegatee_from_string(self,s:str):
         if self.is_delegatee_name_valid(s) is True:
             addr = s.ljust(32,'\x00').encode()
-            sid = DioxAddressType.DELEGATEE_OFFSET.value + self.__type.value
+            sid = self.__type.value
             crc = sid | (0xfffffff0 & crc32c.crc32c(addr, sid))
             self.__address = addr + crc.to_bytes(4, 'little')
             return True
@@ -140,7 +151,7 @@ class DioxAccount:
                 sk_bytes = base64.b64decode(key)[0:32]
                 sk = ed25519.SigningKey(sk_s=sk_bytes)
                 vk = sk.get_verifying_key()
-                crc = 3 | (0xfffffff0 & crc32c.crc32c(vk.vk_s, 3))
+                crc = type.value | (0xfffffff0 & crc32c.crc32c(vk.vk_s, type.value))
                 address = vk.vk_s + crc.to_bytes(4, 'little')
                 return DioxAccount(sk.sk_s,vk.vk_s,address,type)
             else:
@@ -177,7 +188,7 @@ class DioxAccount:
         try:
             if account_type == DioxAccountType.ED25519:
                 sk, pk = ed25519.create_keypair()
-                crc = 3 | (0xfffffff0 & crc32c.crc32c(pk.vk_s, 3))
+                crc = account_type.value | (0xfffffff0 & crc32c.crc32c(pk.vk_s, account_type.value))
                 address = pk.vk_s + crc.to_bytes(4, 'little')
                 return DioxAccount(sk.sk_s,pk.vk_s,address,DioxAccountType.ED25519)
             else:
@@ -254,8 +265,9 @@ class DioxAccount:
     def sign_diox_transaction(self,txdata:bytes):
         try:
             sk = ed25519.SigningKey(sk_s=self.__private_key)
-            sig = sk.sign(txdata  +b'\x03' + self.__public_key)
-            signed_tx_data = txdata + b'\x03' + self.__public_key +  sig
+            sid = self.account_type.value.to_bytes(1,byteorder="little")
+            sig = sk.sign(txdata  + sid + self.__public_key)
+            signed_tx_data = txdata + sid + self.__public_key +  sig
             # calculate txn pow
             nonces:list[int] = calculate_txn_pow(signed_tx_data)
             for nonce in nonces:
