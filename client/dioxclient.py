@@ -5,11 +5,11 @@
 """  
 from client import clientlogger
 from client.stat import StatTool
-from client_config import Config
+from dioxide_python_sdk.config.client_config import Config
 from utils.rpc import HTTPProvide
 from client.account import DioxAccount,DioxAddress,DioxAddressType
 from utils.gadget import exception_handler,get_subscribe_message
-from attributedict.collections import AttributeDict
+from box import Box
 import client.types as dioxtypes
 import queue
 import base64
@@ -219,7 +219,7 @@ class DioxClient:
         params.update({"query_type":0})
         params.update({"height":height})
         response = self.make_request(method,params)
-        return AttributeDict(response)
+        return Box(response,default_box=True)
 
     """
     @description:
@@ -236,7 +236,7 @@ class DioxClient:
         params.update({"query_type":1})
         params.update({"hash":hash})
         response = self.make_request(method,params)
-        return AttributeDict(response)
+        return Box(response,default_box=True)
 
     """
     @description:
@@ -276,7 +276,7 @@ class DioxClient:
         params.update({"shard_index":shard_index})
         params.update({"height":height})
         response = self.make_request(method,params)
-        return AttributeDict(response)
+        return Box(response,default_box=True)
 
     """
     @description:
@@ -295,7 +295,7 @@ class DioxClient:
         params.update({"shard_index":shard_index})
         params.update({"hash":hash})
         response = self.make_request(method,params)
-        return AttributeDict(response)
+        return Box(response,default_box=True)
     
     """
     @description:
@@ -325,7 +325,7 @@ class DioxClient:
         if shard_index is not None:
             params.update({"shard_index":shard_index})
         response = self.make_request(method,params)
-        return AttributeDict(response)
+        return Box(response,default_box=True)
     
     """
     @description:
@@ -411,7 +411,7 @@ class DioxClient:
         method = "dx.contract_info"
         params = {"contract":"{}.{}".format(dapp_name,contract_name)}
         response = self.make_request(method,params)
-        return AttributeDict(response)
+        return Box(response,default_box=True)
 
     """
     @description:
@@ -512,7 +512,7 @@ class DioxClient:
         if scope.value != scope.Global:
             params.update({"scope_key":key})
         response = self.make_request(method,params)
-        return AttributeDict(response)
+        return Box(response,default_box=True)
 
     """
     @description:
@@ -527,7 +527,7 @@ class DioxClient:
         method = "dx.dapp"
         params = {"name":"{}".format(dapp_name)}
         response = self.make_request(method,params)
-        return AttributeDict(response)
+        return Box(response,default_box=True)
 
     """
     @description:
@@ -542,7 +542,7 @@ class DioxClient:
         method = "dx.token"
         params = {"symbol":"{}".format(token_symbol)}
         response = self.make_request(method,params)
-        return AttributeDict(response)
+        return Box(response,default_box=True)
 
     #if overflow tcp buffer, consider use message queue
     @exception_handler

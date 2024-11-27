@@ -1,6 +1,10 @@
 import logging
 import logging.handlers
-from client_config import Config
+from dioxide_python_sdk.config.client_config import Config
+import os
+
+if not os.path.exists(Config.log_dir):
+    os.makedirs(Config.log_dir)
 
 client_logger = logging.getLogger(__name__)
 client_logger.setLevel(level = logging.DEBUG)
