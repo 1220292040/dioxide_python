@@ -1,13 +1,21 @@
 # Dioxide Python SDK
-Welcome to Dioxide Python SDK! This SDK provides developers with a set of tools and functionalities to simplify  your development process in dioxide.
+Welcome to Dioxide Python SDK! This SDK provides developers with a set of tools and functionalities to simplify your development process in dioxide.
 
-## Usage
+## Install
 ```shell
 git clone https://github.com/1220292040/diox_python_sdk.git
 cd diox_python_sdk
 python setup.py install
 ```
+## Features
+- Feature 1: get on-chain infos by sdk
+> With SDK, you can access a variety of on-chain information, such as transactions, blocks, shard index, contract state and more.
 
+- Feature 2: create an account, compose or sign transactions
+> With SDK, you can also create a valid account, and send transactions.
+
+
+## Usage
 in your project, you can use sdk as :
 ```python
 # demo.py
