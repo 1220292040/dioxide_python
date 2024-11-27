@@ -40,10 +40,10 @@ class DioxClient:
     ws_rpc = None
     ws_connections = None
 
-    def __init__(self,url = Config.rpc_url):
+    def __init__(self,url = Config.rpc_url,ws_url = Config.ws_rpc):
         self.rpc = HTTPProvide(url)
         self.rpc.logger = self.logger
-        self.ws_rpc = Config.ws_rpc
+        self.ws_rpc = ws_url
         self.ws_connections = {}
         self.loop = asyncio.new_event_loop() 
         threading.Thread(target=self.__start_loop, daemon=True).start()
