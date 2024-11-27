@@ -40,8 +40,8 @@ class DioxClient:
     ws_rpc = None
     ws_connections = None
 
-    def __init__(self):
-        self.rpc = HTTPProvide(url=Config.rpc_url)
+    def __init__(self,url = Config.rpc_url):
+        self.rpc = HTTPProvide(url)
         self.rpc.logger = self.logger
         self.ws_rpc = Config.ws_rpc
         self.ws_connections = {}
