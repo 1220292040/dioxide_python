@@ -578,7 +578,12 @@ class DioxClient:
     def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,gas_price=None,gas_limit=None,is_sync=False,timeout=DEFAULT_TIMEOUT):
         unsigned_txn = self.compose_transaction(sender=user.address,
                                           function=function,
-                                          args=args
+                                          args=args,
+                                          tokens=tokens,
+                                          isn=isn,
+                                          is_delegatee=is_delegatee,
+                                          gas_price=gas_price,
+                                          gas_limit=gas_limit
                                         )
         signed_txn = user.sign_diox_transaction(unsigned_txn)
         tx_hash = self.send_raw_transaction(signed_txn,is_sync,timeout)
