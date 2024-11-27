@@ -118,7 +118,7 @@ class DioxClient:
         FinalityDistance: uint64 - 最后一个finalize的区块高度距离当前最新高度的差值
         Difficulty: uint64: pow难度
         Global: object - global shard的信息,包括throughput,txcount等
-        Shard: array - per shard 信息
+        Shards: array - per shard 信息
     """
     @exception_handler
     def get_overview(self):
