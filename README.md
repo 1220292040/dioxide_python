@@ -5,6 +5,7 @@ Welcome to Dioxide Python SDK! This SDK provides developers with a set of tools 
 ```shell
 git clone https://github.com/1220292040/diox_python_sdk.git
 cd diox_python_sdk
+pip install -r requirements.txt
 python setup.py install
 ```
 ## Features
