@@ -5,7 +5,7 @@
 """  
 from client import clientlogger
 from client.stat import StatTool
-from dioxide_python_sdk.config.client_config import Config
+from config.client_config import Config
 from utils.rpc import HTTPProvide
 from client.account import DioxAccount,DioxAddress,DioxAddressType
 from utils.gadget import exception_handler,get_subscribe_message
