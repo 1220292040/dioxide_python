@@ -1,6 +1,6 @@
 import logging
 import logging.handlers
-from dioxide_python_sdk.config.client_config import Config
+from config.client_config import Config
 import os
 
 if not os.path.exists(Config.log_dir):
