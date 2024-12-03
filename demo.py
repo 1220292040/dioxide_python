@@ -1,10 +1,8 @@
 
-from client.dioxclient import DioxClient
-from client.account import DioxAccount
-from utils.gadget import title_info
+from dioxide_python_sdk.client.dioxclient import DioxClient
+from dioxide_python_sdk.utils.gadget import title_info
 
 client = DioxClient()
-# client.generate_key_pair()
 title_info("get_overview")
 print(client.get_overview())
 

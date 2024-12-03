@@ -3,19 +3,19 @@
   @author: long
   @date: 2024-09-12
 """  
-from client import clientlogger
-from client.stat import StatTool
-from config.client_config import Config
-from utils.rpc import HTTPProvide
-from client.account import DioxAccount,DioxAddress,DioxAddressType
-from utils.gadget import exception_handler,get_subscribe_message
+from ..client import clientlogger
+from ..client.stat import StatTool
+from ..config.client_config import Config
+from ..utils.rpc import HTTPProvide
+from ..client.account import DioxAccount,DioxAddress,DioxAddressType
+from ..utils.gadget import exception_handler,get_subscribe_message
 from box import Box
-import client.types as dioxtypes
+from . import types as dioxtypes
 import queue
 import base64
 import time
 import json
-from client.contract import Scope
+from ..client.contract import Scope
 import os,threading
 import websockets
 from concurrent.futures import ThreadPoolExecutor

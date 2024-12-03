@@ -5,7 +5,7 @@
 """
 import time
 import struct
-from client import contract
+from ..client import contract
 
 
 class UnsignedTransaction:
