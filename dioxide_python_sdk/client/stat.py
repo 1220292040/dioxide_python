@@ -1,5 +1,5 @@
 import time
-from client import clientlogger
+from ..client import clientlogger
 
 class StatTool:
     begin = time.time()

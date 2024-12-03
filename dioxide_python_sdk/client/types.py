@@ -1,5 +1,3 @@
-
-
 from enum import Enum
 
 GLOBAL_IDENTIFIER = 65535

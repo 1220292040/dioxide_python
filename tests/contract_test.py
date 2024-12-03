@@ -1,9 +1,9 @@
-import os,sys
+import sys
 sys.path.append('.')
 
-from client.dioxclient import DioxClient
-from client.account import DioxAccount,DioxAddress,DioxAddressType
-from client.contract import Scope
+from dioxide_python_sdk.client.dioxclient import DioxClient
+from dioxide_python_sdk.client.account import DioxAccount
+from dioxide_python_sdk.client.contract import Scope
 
 client = DioxClient()
 

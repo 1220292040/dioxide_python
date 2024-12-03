@@ -1,8 +1,8 @@
 
-from client.stat import StatTool
+from ..client.stat import StatTool
 import logging
 import json
-from utils.request import make_post_request
+from ..utils.request import make_post_request
 
 class HTTPProvide:
     logger = logging.getLogger("client.providers.HTTPProvider")

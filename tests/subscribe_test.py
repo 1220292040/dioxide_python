@@ -1,6 +1,6 @@
-import os,sys,time,threading
+import sys,time,threading
 sys.path.append('.')
-from client.dioxclient import DioxClient
+from dioxide_python_sdk.client.dioxclient import DioxClient
 
 def handler(r):
     print(r)

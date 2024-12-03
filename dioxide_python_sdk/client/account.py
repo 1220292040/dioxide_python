@@ -5,7 +5,7 @@ import crc32c # type: ignore
 import krock32
 from enum import Enum
 import re
-from utils.gadget import calculate_txn_pow
+from ..utils.gadget import calculate_txn_pow
 
 class DioxAccountType(Enum):
     ETHEREUM = 1

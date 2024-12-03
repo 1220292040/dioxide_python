@@ -1,9 +1,9 @@
 
-import os,sys
+import sys
 sys.path.append('.')
 
-from client.dioxclient import DioxClient
-from client.types import GLOBAL_IDENTIFIER
+from dioxide_python_sdk.client.dioxclient import DioxClient
+from dioxide_python_sdk.client.types import GLOBAL_IDENTIFIER
 
 client = DioxClient()
 cur_height = client.get_block_number()
