@@ -1,4 +1,5 @@
 import hashlib,json
+from ..client.types import SubscribeTopic
 
 def exception_handler(func):
     def wrapper(*args, **kwargs):
@@ -69,17 +70,16 @@ def calculate_txn_pow(tx):
 
     return nonces
 
-
-def get_subscribe_message(topic: str):
-    if topic == "consensus_header":
+def get_subscribe_message(topic: SubscribeTopic):
+    if topic == SubscribeTopic.CONSENSUS_HEADER:
         return json.dumps({"req": "subscribe.master_commit_head"})
-    elif topic == "transaction_block":
+    elif topic == SubscribeTopic.TRANSACTION_BLOCK:
         return json.dumps({"req": "subscribe.block_commit_on_head"})
-    elif topic == "transaction":
+    elif topic == SubscribeTopic.TRANSACTION:
         return json.dumps({"req": "subscribe.txn_confirm_on_head"})
-    elif topic == "state":
+    elif topic == SubscribeTopic.STATE:
         return json.dumps({"req": "subscribe.state_update"})
-    elif topic == "relays":
+    elif topic == SubscribeTopic.RELAYS:
         return json.dumps({"req": "subscribe.txn_emit_on_head"})
     else:
         raise ValueError("Invalid topic type")
