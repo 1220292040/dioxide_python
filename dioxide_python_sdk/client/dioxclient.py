@@ -693,12 +693,31 @@ class DioxClient:
             return False
         return tx.ConfirmState in dioxtypes.TXN_CONFIRMED_STATUS
     
+    def is_tx_success(self,tx):
+        if tx is None or \
+            tx.get("Invocation",None) is None or \
+                tx["Invocation"].get("Status",None) is None or \
+                tx["Invocation"]["Status"] != "IVKRET_SUCCESS":
+            return False
+        return True
+
     def is_tx_confirmed_with_relays(self,tx):
         q = queue.Queue()
         q.put(tx.Hash)
         while not q.empty():
             cur_tx = self.get_transaction(q.get())
             if not self.is_tx_confirmed(cur_tx):
+                return False
+            for relay_tx_hash in cur_tx.Invocation.get("Relays",[]):
+                q.put(relay_tx_hash)
+        return True
+
+    def is_tx_success_with_relays(self,tx):
+        q = queue.Queue()
+        q.put(tx.Hash)
+        while not q.empty():
+            cur_tx = self.get_transaction(q.get())
+            if not self.is_tx_success(cur_tx):
                 return False
             for relay_tx_hash in cur_tx.Invocation.get("Relays",[]):
                 q.put(relay_tx_hash)
