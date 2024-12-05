@@ -9,6 +9,8 @@ from ..config.client_config import Config
 from ..utils.rpc import HTTPProvide
 from ..client.account import DioxAccount,DioxAddress,DioxAddressType
 from ..utils.gadget import exception_handler,get_subscribe_message
+from ..client.filters import *
+from ..client.handlers import *
 from box import Box
 from . import types as dioxtypes
 import queue
@@ -546,10 +548,35 @@ class DioxClient:
 
     #if overflow tcp buffer, consider use message queue
     @exception_handler
-    def subscribe(self,topic:str,handler,filter=None):
+    def subscribe(self,topic:dioxtypes.SubscribeTopic,handler=default_handler,filter=None):
         thread_id = threading.get_ident()
         asyncio.set_event_loop(self.loop)
         asyncio.run_coroutine_threadsafe(self.__subscribe(topic,thread_id, handler, filter),self.loop)
+    
+
+    @exception_handler
+    def subscribe_state_with_dapp(self,dapp_name,handler=default_handler):
+        self.subscribe(dioxtypes.SubscribeTopic.STATE,default_dapp_state_handler(dapp_name,handler),dapp_filter(dapp_name))
+
+    @exception_handler
+    def subscribe_state_with_contract(self,contract_name,handler=default_handler):
+        self.subscribe(dioxtypes.SubscribeTopic.STATE,default_contract_state_handler(contract_name,handler),contract_filter(contract_name))
+    
+    @exception_handler
+    def subscribe_state_with_scpoekey(self,scopekey:str,handler=default_handler):
+        self.subscribe(dioxtypes.SubscribeTopic.STATE,default_scopekey_state_handler(scopekey,handler),scopekey_filter(scopekey))
+
+    @exception_handler
+    def subscribe_state_with_contract_and_scopekey(self,contract_name,scopekey:str,handler=default_handler):
+        self.subscribe(dioxtypes.SubscribeTopic.STATE,default_contract_scopekey_state_handler(contract_name,scopekey,handler),contract_and_scopekey_filter(contract_name,scopekey))
+
+    @exception_handler
+    def subscribe_state_with_contract_and_statekey(self,contract_name,statekey:str,handler=default_handler):
+        self.subscribe(dioxtypes.SubscribeTopic.STATE,default_contract_statekey_state_handler(contract_name,statekey,handler),contract_and_statekey_filter(contract_name,statekey))
+
+    @exception_handler
+    def subscribe_block_with_height(self,topic:dioxtypes.SubscribeTopic,start=0,end=0xffffffff,handler=default_handler):
+        self.subscribe(topic,handler,height_filter(start,end))
 
     @exception_handler
     def unsubscribe(self,thread_id):
@@ -557,7 +584,7 @@ class DioxClient:
         if ws is not None:
             asyncio.run_coroutine_threadsafe(self.__unsubscribe(ws, thread_id),self.loop)
 
-    async def __subscribe(self,topic:str,thread_id,handler,filter=None):
+    async def __subscribe(self,topic:dioxtypes.SubscribeTopic,thread_id,handler,filter=None):
         executor = ThreadPoolExecutor(max_workers=Config.default_thread_nums)
         ws = await websockets.connect(self.ws_rpc, ping_interval=None)
         self.ws_connections[thread_id] = ws
@@ -661,17 +688,17 @@ class DioxClient:
 
 
     #aux method ----------------------------------------------------------------
-    def tx_confirmed(self,tx):
+    def is_tx_confirmed(self,tx):
         if tx is None or tx.get("ConfirmState",None) is None :
             return False
         return tx.ConfirmState in dioxtypes.TXN_CONFIRMED_STATUS
     
-    def wait_for_tx_confirmed_with_relays(self,tx):
+    def is_tx_confirmed_with_relays(self,tx):
         q = queue.Queue()
         q.put(tx.Hash)
         while not q.empty():
             cur_tx = self.get_transaction(q.get())
-            if not self.tx_confirmed(cur_tx):
+            if not self.is_tx_confirmed(cur_tx):
                 return False
             for relay_tx_hash in cur_tx.Invocation.get("Relays",[]):
                 q.put(relay_tx_hash)
@@ -679,7 +706,7 @@ class DioxClient:
 
     def get_all_relay_transactions(self,tx,detail=False):
         res = []
-        if self.wait_for_tx_confirmed_with_relays(tx):
+        if self.is_tx_confirmed_with_relays(tx):
             q = queue.Queue()
             q.put(tx)
             while not q.empty():
@@ -693,7 +720,7 @@ class DioxClient:
     def wait_for_transaction_confirmed(self,tx_hash,timeout):
         start = time.time()
         tx = self.get_transaction(tx_hash)
-        while not self.wait_for_tx_confirmed_with_relays(tx):
+        while not self.is_tx_confirmed_with_relays(tx):
             if time.time() - start > timeout:
                 return False
             time.sleep(1)

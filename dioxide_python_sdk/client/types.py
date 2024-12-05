@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum,auto
 
 GLOBAL_IDENTIFIER = 65535
 
@@ -49,3 +49,15 @@ class TxnConfirmState(Enum):
 TXN_CONFIRMED_STATUS = [TxnConfirmState.TXN_ARCHIVED.name,TxnConfirmState.TXN_CONFIRMED.name,TxnConfirmState.TXN_FINALIZED.name]
 TXN_FINALIZED_STATUS = [TxnConfirmState.TXN_ARCHIVED.name,TxnConfirmState.TXN_FINALIZED.name]
 TXN_ARCHIVED_STATUS = [TxnConfirmState.TXN_ARCHIVED.name]
+
+class SubscribeTopic(Enum):
+    CONSENSUS_HEADER = auto()
+    TRANSACTION_BLOCK = auto()
+    TRANSACTION = auto()
+    STATE = auto()
+    RELAYS = auto()
+
+ScatterMapStateMsgKeyName=["GlobalScatteredMaps","ScatteredMapOnShard_CloneScale","ScatteredMapOnShard_SplitScale"]
+KeyedStateMsgKeyName=["KeyedScopeStates","GlobalScatteredMaps","ScatteredMapOnShard_CloneScale","ScatteredMapOnShard_SplitScale"]
+NonKeyedStateMsgKeyName=["GlobalStates","ShardStates"]
+AllStateMsgKeyName=KeyedStateMsgKeyName + NonKeyedStateMsgKeyName
