@@ -1,102 +1,6 @@
-import hashlib,json
-from ..client.types import SubscribeTopic
 import struct
 import krock32
 
-def exception_handler(func):
-    def wrapper(*args, **kwargs):
-        try:
-            result = func(*args, **kwargs)
-            return result
-        except Exception as e:
-            print(f"exception: {e}")
-    return wrapper
-
-# pow
-class PowDifficulty:
-    def __init__(self):
-        self._TargetNum = 0
-        self._NonZeroBytes = 0
-
-    def set(self, denominator):
-        num = 0x8000000000000000 // denominator
-        shift = 64 - num.bit_length()
-        num <<= shift
-        
-        exp = 32 * 8 - 63 - shift
-        bytes_needed = exp // 8
-        residue = exp % 8
-        if residue:
-            bytes_needed += 1
-            num >>= (8 - residue)
-
-        self._TargetNum = num >> 32
-        self._NonZeroBytes = bytes_needed + 8  # ULONGLONG size
-    
-    def is_fullfiled(self,val):
-        if self._TargetNum <= int.from_bytes(val[self._NonZeroBytes-4:self._NonZeroBytes],'little'):
-            return False
-        p = self._NonZeroBytes
-        while p < 32:
-            if val[p] > 0:
-                return False
-            p += 1
-        return True
-
-
-def get_ttl_from_signed_txn(tx):
-    ttl_sc_tsc = int.from_bytes(tx[12:14],'little')
-    return 1 + (ttl_sc_tsc & 0x01ff)
-
-def get_pow_difficulty(tx_size,ttl=30):
-    pow_diff = PowDifficulty()
-    denominator = (1000 + tx_size * (ttl * 10 + 100)) // 3
-    pow_diff.set(denominator)
-    return pow_diff
-
-def calculate_txn_pow(tx):
-    pow_data = hashlib.sha512(tx).digest()[0:-4]
-    nonces = [0] * 3
-    diff = get_pow_difficulty(len(tx)+12,get_ttl_from_signed_txn(tx))
-
-    nonce = 0
-    for i in range(3):
-        while True:
-            nonce_bytes = nonce.to_bytes(4, byteorder='little')
-            hash_result = hashlib.sha256(pow_data + nonce_bytes).digest()
-            if diff.is_fullfiled(hash_result):
-                nonces[i] = nonce
-                break
-            nonce += 1
-        nonce += 1
-
-    return nonces
-
-def get_subscribe_message(topic: SubscribeTopic):
-    if topic == SubscribeTopic.CONSENSUS_HEADER:
-        return json.dumps({"req": "subscribe.master_commit_head"})
-    elif topic == SubscribeTopic.TRANSACTION_BLOCK:
-        return json.dumps({"req": "subscribe.block_commit_on_head"})
-    elif topic == SubscribeTopic.TRANSACTION:
-        return json.dumps({"req": "subscribe.txn_confirm_on_head"})
-    elif topic == SubscribeTopic.STATE:
-        return json.dumps({"req": "subscribe.state_update"})
-    elif topic == SubscribeTopic.RELAYS:
-        return json.dumps({"req": "subscribe.txn_emit_on_head"})
-    else:
-        raise ValueError("Invalid topic type")
-    
-
-def title_info(msg):
-    print("#######################{}################".format(msg))
-
-
-"""
-parse_serialized_args will parse serialized args by signature type order
-signature: str  => "<name1>:<type1>,<name2>:<type2>,<name3>:<type3>...<namen>:<typen>"
-for example , in action1(to,1u32,2u32), parse signature: "to:address,a:uint32,b:uint32"
-Warning!: only support fixed-size (int,float,uint,address,hash..) and bigint,token,string, not support array,map,struct
-"""
 def parse_serialized_args(sigature:str,sargs,offset=False):
     def parse_uint(type,data,cur):
         bitwidth = int(type[4:])//8
@@ -195,6 +99,21 @@ def parse_serialized_args(sigature:str,sargs,offset=False):
         ret[symbol],cur = parse_bigint(data,cur)
         return ret,cur
 
+    def parse_in_type(sig,type):
+        start = type.find(sig)
+        start += len(sig)
+        level = 1
+        content = []
+        for char in type[start:]:
+            if char == '<':
+                level += 1
+            elif char == '>':
+                level -= 1
+                if level == 0:
+                    return ''.join(content)
+            content.append(char)
+        return None
+
     ret = {}
     params = sigature.split(",")
     data = bytes.fromhex(sargs)
@@ -240,3 +159,8 @@ def parse_serialized_args(sigature:str,sargs,offset=False):
         idx += 1
     
     return ret
+
+if __name__ == "__main__":
+    test = "0100000042ffffffffffffff00000000000000000000000000000000000000000000008000cccccc5d6d1190230de60241ec820db633cf44d5af4bb53a3d3391a5a18120326404dc0327276f010089fef9643d6eb7f5910f3e648d3afd230da39bf389a614de403a5bbe85f7196f1d0061736a646875696f666568756967687265697567726865697567686572020000000081efac855b416d2dee04000044494f0000000000016400000000000000"
+    ret1 = parse_serialized_args("uint32:a,float256:f,address:to,bool:b,bool:c,hash:h,string:s,bigint:n,token:t",test)
+    print(ret1)
