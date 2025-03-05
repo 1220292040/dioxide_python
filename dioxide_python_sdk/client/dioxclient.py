@@ -782,11 +782,3 @@ class DioxClient:
             return True
         else:
             return False
-
-    def wait_for_contract_deployed(self,dapp_name,contract_name,timeout=DEFAULT_TIMEOUT):
-        start = time.time()
-        while not self.get_deployed_contract_info(dapp_name,contract_name):
-            if time.time() - start > timeout:
-                return False
-            time.sleep(2)
-        return True
