@@ -514,7 +514,7 @@ class DioxClient:
             progress_bar(cur_height-base,target_height-base,title="Deploy Process: ")
             cur_height = self.get_block_number()
             time.sleep(0.5)
-        print()
+        print("Deploy finish.")
 
     """
     @description:
@@ -577,20 +577,20 @@ class DioxClient:
         self.subscribe(dioxtypes.SubscribeTopic.STATE,default_dapp_state_handler(dapp_name,handler),dapp_filter(dapp_name))
 
     @exception_handler
-    def subscribe_state_with_contract(self,contract_name,handler=default_handler):
-        self.subscribe(dioxtypes.SubscribeTopic.STATE,default_contract_state_handler(contract_name,handler),contract_filter(contract_name))
+    def subscribe_state_with_contract(self,dapp_contract_name,handler=default_handler):
+        self.subscribe(dioxtypes.SubscribeTopic.STATE,default_contract_state_handler(dapp_contract_name,handler),contract_filter(dapp_contract_name))
     
     @exception_handler
     def subscribe_state_with_scpoekey(self,scopekey:str,handler=default_handler):
         self.subscribe(dioxtypes.SubscribeTopic.STATE,default_scopekey_state_handler(scopekey,handler),scopekey_filter(scopekey))
 
     @exception_handler
-    def subscribe_state_with_contract_and_scopekey(self,contract_name,scopekey:str,handler=default_handler):
-        self.subscribe(dioxtypes.SubscribeTopic.STATE,default_contract_scopekey_state_handler(contract_name,scopekey,handler),contract_and_scopekey_filter(contract_name,scopekey))
+    def subscribe_state_with_contract_and_scopekey(self,dapp_contract_name,scopekey:str,handler=default_handler):
+        self.subscribe(dioxtypes.SubscribeTopic.STATE,default_contract_scopekey_state_handler(dapp_contract_name,scopekey,handler),contract_and_scopekey_filter(dapp_contract_name,scopekey))
 
     @exception_handler
-    def subscribe_state_with_contract_and_statekey(self,contract_name,statekey:str,handler=default_handler):
-        self.subscribe(dioxtypes.SubscribeTopic.STATE,default_contract_statekey_state_handler(contract_name,statekey,handler),contract_and_statekey_filter(contract_name,statekey))
+    def subscribe_state_with_contract_and_statekey(self,dapp_contract_name,statekey:str,handler=default_handler):
+        self.subscribe(dioxtypes.SubscribeTopic.STATE,default_contract_statekey_state_handler(dapp_contract_name,statekey,handler),contract_and_statekey_filter(dapp_contract_name,statekey))
 
     @exception_handler
     def subscribe_block_with_height(self,topic:dioxtypes.SubscribeTopic,start=0,end=0xffffffff,handler=default_handler):
