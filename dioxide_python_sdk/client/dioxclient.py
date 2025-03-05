@@ -514,7 +514,7 @@ class DioxClient:
             progress_bar(cur_height-base,target_height-base,title="Deploy Process: ")
             cur_height = self.get_block_number()
             time.sleep(0.5)
-        print("Deploy finish.")
+        print("\nDeploy finish.")
 
     """
     @description:
