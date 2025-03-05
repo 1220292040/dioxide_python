@@ -10,11 +10,11 @@ def dapp_filter(dapp_name):
         return False
     return filter
 
-def contract_filter(contract_name):
+def contract_filter(dapp_contract_name):
     def filter(r):
         for scope in AllStateMsgKeyName:
             for state in r.get(f"{scope}",[]):
-                if state.get("Contract",None) is not None and ".".join(state["Contract"].split(".")[:2]) == contract_name:
+                if state.get("Contract",None) is not None and ".".join(state["Contract"].split(".")[:2]) == dapp_contract_name:
                     return True
         return False
     return filter
@@ -28,22 +28,25 @@ def scopekey_filter(scopekey:str):
         return False
     return filter
 
-def contract_and_scopekey_filter(contract_name,scopekey):
+def contract_and_scopekey_filter(dapp_contract_name,scopekey):
     def filter(r):
         for scope in KeyedStateMsgKeyName:
             for state in r.get(f"{scope}",[]):
                 if (state.get("Key",None) is not None and state["Key"] == scopekey) and \
-                    (state.get("Contract",None) is not None and ".".join(state["Contract"].split(".")[:2]) == contract_name):
+                    (state.get("Contract",None) is not None and ".".join(state["Contract"].split(".")[:2]) == dapp_contract_name):
                     return True
         return False
     return filter
 
-def contract_and_statekey_filter(contract_name,statekey:str):
+def contract_and_statekey_filter(dapp_contract_name,statekey:str):
     def filter(r):
         for scope in AllStateMsgKeyName:
             for state in r.get(f"{scope}",[]):
-                if (state.get("State",None) is not None and state["State"].get(statekey,None) != None) and \
-                    (state.get("Contract",None) is not None and ".".join(state["Contract"].split(".")[:2]) == contract_name):
+                if state.get("State",None) is not None and \
+                    isinstance(state["State"],dict) and \
+                    state["State"].get(statekey,None) != None and \
+                    state.get("Contract",None) is not None and \
+                    ".".join(state["Contract"].split(".")[:2]) == dapp_contract_name:
                     return True
         return False
     return filter
