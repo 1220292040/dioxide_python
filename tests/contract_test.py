@@ -16,6 +16,7 @@ dapp_name = "00Dapp"
 bank_contract_name = "Bank"
 ens_contract_name = "ENS"
 
+#create dapp
 tx_hash,ok = client.create_dapp(tester,dapp_name,10**11)
 print(tx_hash)
 
@@ -29,23 +30,18 @@ if ok:
             "_owner":"{}".format(tester.address)
         }
     ]
-    print(client.deploy_contracts(dapp_name=dapp_name,delegator=tester,dir_path="./test_contracts",construct_args=constructors))
-    if client.wait_for_contract_deployed(dapp_name,bank_contract_name):
-        print("deploy success")
-    else:
-        print("deploy fail")
-else:
-    print("error")
+    client.deploy_contracts(dapp_name=dapp_name,delegator=tester,dir_path="./test_contracts",construct_args=constructors,compile_time=10)
 
-contract_info = client.get_contract_info(dapp_name,bank_contract_name)
-print(contract_info)
+    #contract info
+    contract_info = client.get_contract_info(dapp_name,bank_contract_name)
+    print(contract_info)
 
-#invoke
-client.send_transaction(tester,"{}.{}.{}".format(dapp_name,ens_contract_name,"set_ens"),{"_cid":287764905985},is_sync=True)
-client.send_transaction(tester,"{}.{}.{}".format(dapp_name,bank_contract_name,"set_authority"),{"_controller":"0x0000004300200001:contract"},is_sync=True)
-client.send_transaction(tester,"{}.{}.{}".format(dapp_name,ens_contract_name,"invoke"),{"operation":"deposit","amount":1000},is_sync=True)
-print(client.get_contract_state(dapp_name,bank_contract_name,Scope.Address,tester.address))
+    #invoke
+    client.send_transaction(tester,"{}.{}.{}".format(dapp_name,ens_contract_name,"set_ens"),{"_cid":287764905985},is_sync=True)
+    client.send_transaction(tester,"{}.{}.{}".format(dapp_name,bank_contract_name,"set_authority"),{"_controller":"0x0000004300200001:contract"},is_sync=True)
+    client.send_transaction(tester,"{}.{}.{}".format(dapp_name,ens_contract_name,"invoke"),{"operation":"deposit","amount":1000},is_sync=True)
+    print(client.get_contract_state(dapp_name,bank_contract_name,Scope.Address,tester.address))
 
-client.send_transaction(tester,"{}.{}.{}".format(dapp_name,ens_contract_name,"invoke"),{"operation":"withdraw","amount":100},is_sync=True)
-print(client.get_contract_state(dapp_name,bank_contract_name,Scope.Address,tester.address))
+    client.send_transaction(tester,"{}.{}.{}".format(dapp_name,ens_contract_name,"invoke"),{"operation":"withdraw","amount":100},is_sync=True)
+    print(client.get_contract_state(dapp_name,bank_contract_name,Scope.Address,tester.address))
 

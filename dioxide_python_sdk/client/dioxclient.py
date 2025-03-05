@@ -8,7 +8,7 @@ from ..client.stat import StatTool
 from ..config.client_config import Config
 from ..utils.rpc import HTTPProvide
 from ..client.account import DioxAccount,DioxAddress,DioxAddressType
-from ..utils.gadget import exception_handler,get_subscribe_message
+from ..utils.gadget import exception_handler,get_subscribe_message,progress_bar
 from ..client.filters import *
 from ..client.handlers import *
 from box import Box
@@ -441,7 +441,7 @@ class DioxClient:
                 deploy_args.update({"code":[source_code]})
         deploy_args.update({"cargs":[json.dumps(construct_args)]})
         if compile_time is not None:
-            deploy_args.update({"timeout":compile_time})
+            deploy_args.update({"time":compile_time})
         dapp_address = DioxAddress(None,DioxAddressType.DAPP)
         if not dapp_address.set_delegatee_from_string(dapp_name):
             raise DioxError(-10002, "invalid dapp name") 
@@ -451,7 +451,8 @@ class DioxClient:
             args=deploy_args,
             is_delegatee=True
         )
-        tx_hash = self.send_raw_transaction(delegator.sign_diox_transaction(deployed_txn))
+        tx_hash = self.send_raw_transaction(delegator.sign_diox_transaction(deployed_txn),True)
+        self.wait_for_deploy(tx_hash)
         return tx_hash
     
     """
@@ -485,7 +486,7 @@ class DioxClient:
         deploy_args.update({"code":codes})
         deploy_args.update({"cargs":cargs})
         if compile_time is not None:
-            deploy_args.update({"timeout":compile_time})
+            deploy_args.update({"time":compile_time})
         dapp_address = DioxAddress(None,DioxAddressType.DAPP)
         if not dapp_address.set_delegatee_from_string(dapp_name):
             raise DioxError(-10002, "invalid dapp name") 
@@ -495,8 +496,25 @@ class DioxClient:
             args=deploy_args,
             is_delegatee=True
         )
-        tx_hash = self.send_raw_transaction(delegator.sign_diox_transaction(deployed_txn))
+        tx_hash = self.send_raw_transaction(delegator.sign_diox_transaction(deployed_txn),True)
+        self.wait_for_deploy(tx_hash)
         return tx_hash
+
+    @exception_handler
+    def wait_for_deploy(self,deploy_hash):
+        state = self.get_contract_state("core","contracts",Scope.Global,None).State
+        target_height = -1
+        if state is not None and state != {}:
+            for s in state.Scheduled:
+                if s.BuildKey == deploy_hash:
+                    target_height = s.TargetHeight
+                    break
+        base = cur_height = self.get_block_number()
+        while cur_height <= target_height:
+            progress_bar(cur_height-base,target_height-base,title="Deploy Process: ")
+            cur_height = self.get_block_number()
+            time.sleep(0.5)
+        print()
 
     """
     @description:
@@ -767,8 +785,8 @@ class DioxClient:
 
     def wait_for_contract_deployed(self,dapp_name,contract_name,timeout=DEFAULT_TIMEOUT):
         start = time.time()
-        while not self.get_contract_info(dapp_name,contract_name):
+        while not self.get_deployed_contract_info(dapp_name,contract_name):
             if time.time() - start > timeout:
                 return False
-            time.sleep(1)
+            time.sleep(2)
         return True

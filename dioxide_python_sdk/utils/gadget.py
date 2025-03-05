@@ -2,6 +2,7 @@ import hashlib,json
 from ..client.types import SubscribeTopic
 import struct
 import krock32
+import sys
 
 def exception_handler(func):
     def wrapper(*args, **kwargs):
@@ -86,6 +87,14 @@ def get_subscribe_message(topic: SubscribeTopic):
     else:
         raise ValueError("Invalid topic type")
     
+
+def progress_bar(current, total, title="" ,bar_length=50):
+    fraction = min(current / total,1)
+    arrow = int(fraction * bar_length - 1) * '=' + '>'
+    padding = (bar_length - len(arrow)) * ' '
+    progress = f'{title}[{arrow}{padding}] {int(fraction*100)}%'
+    sys.stdout.write('\r' + progress) 
+    sys.stdout.flush()
 
 def title_info(msg):
     print("#######################{}################".format(msg))
