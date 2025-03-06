@@ -56,3 +56,16 @@ def height_filter(start,end):
         return r.get("Height",None) is not None and r["Height"]>=start and r["Height"]<end
     return filter
 
+def external_relay_filter(external_name):
+    def filter(r):
+        if r.get("Mode","").find("TMF_EXTERNAL") != -1:
+            if external_name is None:
+                return True
+            target_name = r.get("Target","").split(":")[0]
+            if isinstance(external_name,str):
+                return target_name == external_name
+            if isinstance(external_name,list):
+                return target_name in external_name
+        return False
+
+    return filter
