@@ -1,6 +1,5 @@
 import hashlib,json
 from ..client.types import SubscribeTopic
-import struct
 import krock32
 import sys
 
@@ -84,6 +83,10 @@ def get_subscribe_message(topic: SubscribeTopic):
         return json.dumps({"req": "subscribe.state_update"})
     elif topic == SubscribeTopic.RELAYS:
         return json.dumps({"req": "subscribe.txn_emit_on_head"})
+    elif topic == SubscribeTopic.FINALIZED_BLOCK_AND_TRANSACTION:
+        return json.dumps({"req": "subscribe.block_and_txn_finalize"})
+    elif topic == SubscribeTopic.MEMPOOL:
+        return json.dumps({"req": "subscribe.mempool_insert"})
     else:
         raise ValueError("Invalid topic type")
     
@@ -102,20 +105,20 @@ def title_info(msg):
 
 """
 parse_serialized_args will parse serialized args by signature type order
-signature: str  => "<name1>:<type1>,<name2>:<type2>,<name3>:<type3>...<namen>:<typen>"
-for example , in action1(to,1u32,2u32), parse signature: "to:address,a:uint32,b:uint32"
+signature: str  => "<type1>:<name1>:<type2>:<name2>,<type3>:<name3>...<typen>:<namen>"
+for example , in action1(to,1u32,2u32), parse signature: "address:to,uint32:a,uint32:b"
 Warning!: only support fixed-size (int,float,uint,address,hash..) and bigint,token,string, not support array,map,struct
 """
 def parse_serialized_args(sigature:str,sargs,offset=False):
     def parse_uint(type,data,cur):
         bitwidth = int(type[4:])//8
-        val = struct.unpack('<I',data[cur:cur+bitwidth])[0]
+        val = int.from_bytes(data[cur:cur+bitwidth],byteorder='little',signed=False)
         cur += bitwidth
         return val,cur
     
     def parse_int(type,data,cur):
         bitwidth = int(type[3:])//8
-        val = struct.unpack('<i',data[cur:cur+bitwidth])[0]
+        val = int.from_bytes(data[cur:cur+bitwidth],byteorder='little',signed=True)
         cur += bitwidth
         return val,cur
 
@@ -204,6 +207,21 @@ def parse_serialized_args(sigature:str,sargs,offset=False):
         ret[symbol],cur = parse_bigint(data,cur)
         return ret,cur
 
+    def parse_in_type(sig,type):
+        start = type.find(sig)
+        start += len(sig)
+        level = 1
+        content = []
+        for char in type[start:]:
+            if char == '<':
+                level += 1
+            elif char == '>':
+                level -= 1
+                if level == 0:
+                    return ''.join(content)
+            content.append(char)
+        return None
+
     ret = {}
     params = sigature.split(",")
     data = bytes.fromhex(sargs)
@@ -211,10 +229,10 @@ def parse_serialized_args(sigature:str,sargs,offset=False):
     idx = 0
     for param in params:
         pname_and_type = param.split(":")
-        type = pname_and_type[0]
+        type = pname_and_type[0].strip()
         name = "value#"+str(idx)
         if len(pname_and_type) == 2:
-            name = pname_and_type[1]
+            name = pname_and_type[1].strip()
         #fixed-size
         if type in ["uint8","uint16","uint32","uint64","uint128","uint256","uint512"]:
             ret[name],cur = parse_uint(type,data,cur)

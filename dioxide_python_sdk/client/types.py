@@ -56,6 +56,10 @@ class SubscribeTopic(Enum):
     TRANSACTION = auto()
     STATE = auto()
     RELAYS = auto()
+    FINALIZED_BLOCK_AND_TRANSACTION = auto()
+    MEMPOOL = auto()
+
+
 
 ScatterMapStateMsgKeyName=["GlobalScatteredMaps","ScatteredMapOnShard_CloneScale","ScatteredMapOnShard_SplitScale"]
 KeyedStateMsgKeyName=["KeyedScopeStates","GlobalScatteredMaps","ScatteredMapOnShard_CloneScale","ScatteredMapOnShard_SplitScale"]

@@ -593,6 +593,10 @@ class DioxClient:
         self.subscribe(dioxtypes.SubscribeTopic.STATE,default_contract_statekey_state_handler(dapp_contract_name,statekey,handler),contract_and_statekey_filter(dapp_contract_name,statekey))
 
     @exception_handler
+    def subscribe_external_relay(self, name = None,handler = default_handler):
+        self.subscribe(dioxtypes.SubscribeTopic.RELAYS,handler,external_relay_filter(name))
+
+    @exception_handler
     def subscribe_block_with_height(self,topic:dioxtypes.SubscribeTopic,start=0,end=0xffffffff,handler=default_handler):
         self.subscribe(topic,handler,height_filter(start,end))
 

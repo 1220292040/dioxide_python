@@ -1,16 +1,15 @@
-import struct
 import krock32
 
 def parse_serialized_args(sigature:str,sargs,offset=False):
     def parse_uint(type,data,cur):
         bitwidth = int(type[4:])//8
-        val = struct.unpack('<I',data[cur:cur+bitwidth])[0]
+        val = int.from_bytes(data[cur:cur+bitwidth],byteorder='little',signed=False)
         cur += bitwidth
         return val,cur
     
     def parse_int(type,data,cur):
         bitwidth = int(type[3:])//8
-        val = struct.unpack('<i',data[cur:cur+bitwidth])[0]
+        val = int.from_bytes(data[cur:cur+bitwidth],byteorder='little',signed=True)
         cur += bitwidth
         return val,cur
 
@@ -161,6 +160,6 @@ def parse_serialized_args(sigature:str,sargs,offset=False):
     return ret
 
 if __name__ == "__main__":
-    test = "0100000042ffffffffffffff00000000000000000000000000000000000000000000008000cccccc5d6d1190230de60241ec820db633cf44d5af4bb53a3d3391a5a18120326404dc0327276f010089fef9643d6eb7f5910f3e648d3afd230da39bf389a614de403a5bbe85f7196f1d0061736a646875696f666568756967687265697567726865697567686572020000000081efac855b416d2dee04000044494f0000000000016400000000000000"
-    ret1 = parse_serialized_args("uint32:a,float256:f,address:to,bool:b,bool:c,hash:h,string:s,bigint:n,token:t",test)
+    test = "e2bc6a2fe6104b24b41b4b6864f1b9c2dc533c12debe0316b0d6eba471ef99115336d582e803000000000000000000000000000000000000000000000000000000000000"
+    ret1 = parse_serialized_args("address:to,uint256:amount",test)
     print(ret1)
