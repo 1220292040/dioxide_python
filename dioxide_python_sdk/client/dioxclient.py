@@ -529,7 +529,7 @@ class DioxClient:
     def get_contract_state(self,dapp_name,contract_name,scope:Scope,key):
         method = "dx.contract_state"
         params = {"contract_with_scope":str(dapp_name)+"."+str(contract_name)+"."+scope.name.lower()}
-        if scope.value != scope.Global:
+        if scope.value != scope.Global.value:
             params.update({"scope_key":key})
         response = self.make_request(method,params)
         return Box(response,default_box=True)

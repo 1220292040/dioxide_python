@@ -96,7 +96,11 @@ class DioxAddress:
             return DioxAddress(addr)
         else:
             return None
-        
+    
+    @property
+    def address_bytes(self):
+        return bytes(self.__address)
+
     @property
     def address(self):
         if self.__type == DioxAddressType.DEFAULT:
