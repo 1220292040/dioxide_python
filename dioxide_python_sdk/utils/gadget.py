@@ -104,12 +104,12 @@ def title_info(msg):
 
 
 """
-parse_serialized_args will parse serialized args by signature type order
+deserialized_args will parse serialized args by signature type order
 signature: str  => "<type1>:<name1>:<type2>:<name2>,<type3>:<name3>...<typen>:<namen>"
 for example , in action1(to,1u32,2u32), parse signature: "address:to,uint32:a,uint32:b"
 Warning!: only support fixed-size (int,float,uint,address,hash..) and bigint,token,string, not support array,map,struct
 """
-def parse_serialized_args(sigature:str,sargs,offset=False):
+def deserialized_args(sigature:str,sargs,offset=False):
     def parse_uint(type,data,cur):
         bitwidth = int(type[4:])//8
         val = int.from_bytes(data[cur:cur+bitwidth],byteorder='little',signed=False)
