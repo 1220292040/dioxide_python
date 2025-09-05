@@ -2,6 +2,13 @@ from enum import Enum,auto
 
 GLOBAL_IDENTIFIER = 65535
 
+class EngineID(Enum):
+	Core =  1
+	Native = 2
+	PREDA_NATIVE = 3
+	PREDA_WASM = 4
+	SOLIDITY_EVM = 5
+
 class BlockState(Enum):
     DUS_RECEIVED = 0
     DUS_INVALID = 1
@@ -65,3 +72,6 @@ ScatterMapStateMsgKeyName=["GlobalScatteredMaps","ScatteredMapOnShard_CloneScale
 KeyedStateMsgKeyName=["KeyedScopeStates","GlobalScatteredMaps","ScatteredMapOnShard_CloneScale","ScatteredMapOnShard_SplitScale"]
 NonKeyedStateMsgKeyName=["GlobalStates","ShardStates"]
 AllStateMsgKeyName=KeyedStateMsgKeyName + NonKeyedStateMsgKeyName
+
+if __name__ == "__main__":
+    print(11)
