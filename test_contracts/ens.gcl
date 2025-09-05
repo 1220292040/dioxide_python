@@ -30,6 +30,7 @@ contract ENS {
         {
             __debug.assert(false,"error operation");
         }
+        relay@external InvokeContract(cid,amount);
     }
 
 }

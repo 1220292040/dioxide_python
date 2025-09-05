@@ -1,12 +1,12 @@
-﻿[PRD]: Chain initialized with 4 shard(s), in sync-sharding mode
-[PRD]: 12 addresses added and evenly distributed in shards
-[PRD]: Compiling 1 contract(s), target=PREDA_NATIVE
-[PRD]: Linking 1 contract(s), target=PREDA_NATIVE
-[PRD]: Compiling 1 contract(s), target=PREDA_NATIVE
-[PRD]: Linking 1 contract(s), target=PREDA_NATIVE
-[PRD]: [17:45:47.165] [#g] [h:1] Controller, line 5: controller id: 81606475777
-[PRD]: Compiling 1 contract(s), target=PREDA_NATIVE
-[PRD]: Linking 1 contract(s), target=PREDA_NATIVE
-[PRD]: [17:45:48.822] [#g] [h:2] ENS, line 10: ENS id:81607524353
-[PRD]: Run script successfully
+﻿[GCL]: Chain initialized with 4 shard(s), in sync-sharding mode
+[GCL]: 12 addresses added and evenly distributed in shards
+[GCL]: Compiling 1 contract(s), target=GCL_NATIVE
+[GCL]: Linking 1 contract(s), target=GCL_NATIVE
+[GCL]: Compiling 1 contract(s), target=GCL_NATIVE
+[GCL]: Linking 1 contract(s), target=GCL_NATIVE
+[GCL]: [18:30:06.731] [#g] [h:1] Controller, line 5: controller id: 81606475777
+[GCL]: Compiling 1 contract(s), target=GCL_NATIVE
+[GCL]: Linking 1 contract(s), target=GCL_NATIVE
+[GCL]: [18:30:09.596] [#g] [h:2] ENS, line 10: ENS id:81607524353
+[GCL]: Run script successfully
 
