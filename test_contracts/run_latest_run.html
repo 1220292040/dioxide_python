@@ -1,12 +1,12 @@
-﻿<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta http-equiv="X-UA-Compatible" content="IE=edge"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>run_latest_run</title><script>let BuildContext={args:"",contract:"run.prdts"}</script><script defer="defer" src="{{staticPath}}/main.js"></script><link href="{{staticPath}}/style.css" rel="stylesheet">
+﻿<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta http-equiv="X-UA-Compatible" content="IE=edge"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>run_latest_run</title><script>let BuildContext={args:"",contract:"run.gclts"}</script><script defer="defer" src="{{staticPath}}/main.js"></script><link href="{{staticPath}}/style.css" rel="stylesheet">
 <script type="text/javascript">
-var PREDA_VIZ_LOG = `
+var GCL_VIZ_LOG = `
 [
    {
       "type": "Run",
       "content": 
       {
-         "script": "d:\\python_workspace\\dioxide_python_sdk\\test_contracts\\run.prdts",
+         "script": "d:\\python_workspace\\dioxide_python\\test_contracts\\run.gclts",
          "ShardOrder": 2
       }
    },
@@ -18,8 +18,8 @@ var PREDA_VIZ_LOG = `
          [
             {
                "contract": "Bank",
-               "engine": "PREDA_NATIVE",
-               "hash": "a0g33fsnpcsxd4vhp38xq2cnzd1ee9tb5y7mjcmdceyebzdyxvc0",
+               "engine": "GCL_NATIVE",
+               "hash": "qe3wgnj6hpmj43pje06xz2qrdhzeq8c0ty257y4av007v2256830",
                "finalized": false,
                "ImplmentedInterfaces": [],
                "StateVariables": 
@@ -43,42 +43,48 @@ var PREDA_VIZ_LOG = `
                      "name": "on_deploy",
                      "flag": "InvokeBySystem|GlobalStateDependency",
                      "scope": "global",
-                     "opcode": 0
+                     "opcode": 0,
+                     "params": [{"name": "_owner", "type": "address"}]
                   },
                   {
                      "name": "set_authority",
                      "flag": "InvokeByNormalTransaction|EmitRelayInGlobalScope|GlobalStateDependency",
                      "scope": "address",
-                     "opcode": 1
+                     "opcode": 1,
+                     "params": [{"name": "_controller", "type": "address"}]
                   },
                   {
                      "name": "get",
                      "flag": "InvokeByNormalTransaction",
                      "scope": "address",
-                     "opcode": 2
+                     "opcode": 2,
+                     "params": []
                   },
                   {
                      "name": "add",
                      "flag": "GlobalStateDependency",
                      "scope": "address",
-                     "opcode": 3
+                     "opcode": 3,
+                     "params": [{"name": "amount", "type": "uint32"}]
                   },
                   {
                      "name": "sub",
                      "flag": "GlobalStateDependency",
                      "scope": "address",
-                     "opcode": 4
+                     "opcode": 4,
+                     "params": [{"name": "amount", "type": "uint32"}]
                   },
                   {
                      "name": "__relaylambda_5_set_authority",
                      "flag": "InvokeByRelayTransaction|GlobalStateDependency",
                      "scope": "global",
-                     "opcode": 5
+                     "opcode": 5,
+                     "params": [{"name": "_controller", "type": "address"}]
                   }
                ]
             }
          ],
-         "sources": [{"contract": "Bank", "source": "bank.prd"}]
+         "sources": [{"contract": "Bank", "source": "bank.gcl"}]
       }
    },
    {
@@ -89,8 +95,8 @@ var PREDA_VIZ_LOG = `
          [
             {
                "contract": "Controller",
-               "engine": "PREDA_NATIVE",
-               "hash": "mzxdb1mx6x19fp5mfs003gapnmr560a83n5yd5jxkwp8f0xa0prg",
+               "engine": "GCL_NATIVE",
+               "hash": "vaq0detje66x9s63t8mabdc73h3tf9v6478h6qhvcqpqktf5rdhg",
                "finalized": false,
                "ImplmentedInterfaces": [],
                "StateVariables": [],
@@ -105,24 +111,27 @@ var PREDA_VIZ_LOG = `
                      "name": "on_deploy",
                      "flag": "InvokeBySystem",
                      "scope": "global",
-                     "opcode": 0
+                     "opcode": 0,
+                     "params": []
                   },
                   {
                      "name": "deposit",
                      "flag": "GlobalStateDependency",
                      "scope": "address",
-                     "opcode": 1
+                     "opcode": 1,
+                     "params": [{"name": "amount", "type": "uint32"}]
                   },
                   {
                      "name": "withdraw",
                      "flag": "GlobalStateDependency",
                      "scope": "address",
-                     "opcode": 2
+                     "opcode": 2,
+                     "params": [{"name": "amount", "type": "uint32"}]
                   }
                ]
             }
          ],
-         "sources": [{"contract": "Controller", "source": "controller.prd"}]
+         "sources": [{"contract": "Controller", "source": "controller.gcl"}]
       }
    },
    {
@@ -133,8 +142,8 @@ var PREDA_VIZ_LOG = `
          [
             {
                "contract": "ENS",
-               "engine": "PREDA_NATIVE",
-               "hash": "bw49m7yp3bvwr0hf18d7yhwjf2pgb4w44zgt3qvaeq6napx9a93g",
+               "engine": "GCL_NATIVE",
+               "hash": "j7s2ry9rk7cjqdsg6433fvm5hw09yz9c93hgj3wnqmvvs13m8sdg",
                "finalized": false,
                "ImplmentedInterfaces": [],
                "StateVariables": 
@@ -153,30 +162,38 @@ var PREDA_VIZ_LOG = `
                      "name": "on_deploy",
                      "flag": "InvokeBySystem|GlobalStateDependency",
                      "scope": "global",
-                     "opcode": 0
+                     "opcode": 0,
+                     "params": [{"name": "_owner", "type": "address"}]
                   },
                   {
                      "name": "set_ens",
                      "flag": "InvokeByNormalTransaction|EmitRelayInGlobalScope|GlobalStateDependency",
                      "scope": "address",
-                     "opcode": 1
+                     "opcode": 1,
+                     "params": [{"name": "_cid", "type": "uint64"}]
                   },
                   {
                      "name": "invoke",
                      "flag": "InvokeByNormalTransaction|GlobalStateDependency",
                      "scope": "address",
-                     "opcode": 2
+                     "opcode": 2,
+                     "params": 
+                     [
+                        {"name": "operation", "type": "string"},
+                        {"name": "amount", "type": "uint32"}
+                     ]
                   },
                   {
                      "name": "__relaylambda_3_set_ens",
                      "flag": "InvokeByRelayTransaction|GlobalStateDependency",
                      "scope": "global",
-                     "opcode": 3
+                     "opcode": 3,
+                     "params": [{"name": "_cid", "type": "uint64"}]
                   }
                ]
             }
          ],
-         "sources": [{"contract": "ENS", "source": "ens.prd"}]
+         "sources": [{"contract": "ENS", "source": "ens.gcl"}]
       }
    },
    {
