@@ -3,3 +3,4 @@ logs/
 build/
 dioxide_python_sdk.egg-info/
 dist/
+.vscode/

@@ -462,14 +462,14 @@ class DioxClient:
         dapp_name: dapp名称
         delegator: dapp的所有者,签名账户
         dir_path: 合约文件夹路径
-        suffix: 合约文件后缀,默认部署该文件夹下所有.prd文件
+        suffix: 合约文件后缀,默认部署该文件夹下所有.gcl
         construct_args: 合约构造函数,list[object]
         compile_time: 合约最长的编译时间,一般不设置
     @response -- str
         合约部署交易哈希
     """
     @exception_handler
-    def deploy_contracts(self,dapp_name,delegator:DioxAccount,dir_path=None,suffix=".prd",construct_args:list[dict]=None,compile_time=None):
+    def deploy_contracts(self,dapp_name,delegator:DioxAccount,dir_path=None,suffix=".gcl",construct_args:list[dict]=None,compile_time=None):
         deploy_args={}
         codes = []
         cargs = []
@@ -563,6 +563,26 @@ class DioxClient:
         params = {"symbol":"{}".format(token_symbol)}
         response = self.make_request(method,params)
         return Box(response,default_box=True)
+
+
+    """
+    @description:
+        获取某笔交易中发出的event(relay@external交易)
+    @params:
+        txhash: 交易哈希
+    @response -- object
+        tx: relay@external对应的交易(里面的input字段需要自行反序列化)
+    """
+    @exception_handler
+    def get_events_by_transaction(self,txhash):
+        tx = self.get_transaction(txhash)
+        ret = []
+        relays = self.get_all_relay_transactions(tx,detail=True)
+        for relay in relays:
+            print(relay)
+            if relay.get("Mode","").find("TMF_EXTERNAL") != -1:
+                ret.append(relay)
+        return ret
 
     #if overflow tcp buffer, consider use message queue
     @exception_handler
@@ -786,3 +806,5 @@ class DioxClient:
             return True
         else:
             return False
+    
+    
