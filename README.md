@@ -15,14 +15,12 @@ pip install .
 - Feature 2: create an account, compose or sign transactions
 > With SDK, you can also create a valid account, and send transactions.
 
-
 ## Usage
 in your project, you can use sdk as :
 
 python demo.py
 ```python
 # demo.py
-
 
 from dioxide_python_sdk.client.dioxclient import DioxClient
 from dioxide_python_sdk.client.account import DioxAccount
@@ -37,7 +35,7 @@ pk = "WTKi+W99TEEt153Zt8isUznwXqYkA0aVWEbd7edk6AvivGov5hBLJLQbS2hk8bnC3FM8Et6+Ax
 account = DioxAccount.from_key(pk)
 print(account)
 
-# # mint some tokens 
+# # mint some tokens
 title_info("mint some tokens")
 print(client.mint_dio(account, 10**18))
 
@@ -80,7 +78,6 @@ for event in events:
     print(f"input: {event.Input}")
     #parse input args TODO
 
-
 # title_info("get_overview")
 # print(client.get_overview())
 
@@ -110,4 +107,3 @@ for event in events:
 
 # title_info("get_transaction")
 # print(client.get_transaction("xn3bm3z0r2pcvqkvmtdasvj993fwr7m0vjtx7eb5zft1x8xprdjg"))
-
