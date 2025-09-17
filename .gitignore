@@ -4,3 +4,6 @@ build/
 dioxide_python_sdk.egg-info/
 dist/
 .vscode/
+dioxide_python.code-workspace
+cspell.config.yaml
+.cursor
