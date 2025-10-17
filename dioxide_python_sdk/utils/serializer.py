@@ -1,6 +1,6 @@
 """
-PREDA Data Serialization Implementation
-Core serializer module for handling all PREDA data types according to specification.
+GCL Data Serialization Implementation
+Core serializer module for handling all GCL data types according to specification.
 """
 
 import struct
@@ -8,28 +8,28 @@ from typing import Any, Dict, List, Tuple, Union, Optional
 from enum import Enum
 
 
-class PredaSerializationError(Exception):
-    """Base exception for PREDA serialization errors."""
+class GclSerializationError(Exception):
+    """Base exception for GCL serialization errors."""
     pass
 
 
-class TypeValidationError(PredaSerializationError):
+class TypeValidationError(GclSerializationError):
     """Type validation error."""
     pass
 
 
-class DeserializationError(PredaSerializationError):
+class DeserializationError(GclSerializationError):
     """Deserialization error."""
     pass
 
 
-class UnsupportedTypeError(PredaSerializationError):
+class UnsupportedTypeError(GclSerializationError):
     """Unsupported type error."""
     pass
 
 
-class PredaType(Enum):
-    """PREDA data types enumeration."""
+class GclType(Enum):
+    """GCL data types enumeration."""
     # Fixed-size types
     BOOL = "bool"
     UINT8 = "uint8"
@@ -63,8 +63,8 @@ class PredaType(Enum):
     STRUCT = "struct"
 
 
-class PredaSerializer:
-    """Main PREDA serialization class."""
+class GclSerializer:
+    """Main GCL serialization class."""
 
     def __init__(self):
         self._fixed_type_sizes = {
@@ -78,7 +78,7 @@ class PredaSerializer:
         }
 
     def serialize(self, type_name: str, value: Any) -> bytes:
-        """Serialize a value according to its PREDA type."""
+        """Serialize a value according to its GCL type."""
         if self._is_uint_type(type_name):
             return self._serialize_uint(type_name, value)
         elif self._is_int_type(type_name):
@@ -109,7 +109,7 @@ class PredaSerializer:
             raise UnsupportedTypeError(f"Unsupported type: {type_name}")
 
     def deserialize(self, type_name: str, data: bytes, offset: int = 0) -> Tuple[Any, int]:
-        """Deserialize data according to its PREDA type."""
+        """Deserialize data according to its GCL type."""
         if self._is_uint_type(type_name):
             return self._deserialize_uint(type_name, data, offset)
         elif self._is_int_type(type_name):
@@ -174,20 +174,20 @@ class PredaSerializer:
         return value.to_bytes(byte_size, byteorder='little', signed=True)
 
     def _serialize_float(self, type_name: str, value: float) -> bytes:
-        """Serialize float types according to PREDA format."""
-        # TODO: Implement proper PREDA float format
+        """Serialize float types according to GCL format."""
+        # TODO: Implement proper GCL float format
         # For now, use a placeholder implementation
         byte_size = self._fixed_type_sizes[type_name]
         if type_name == "float256":
-            # Based on PREDA spec example for float256(1.0)
+            # Based on GCL spec example for float256(1.0)
             if value == 1.0:
                 return bytes.fromhex("41ffffffffffffff00000000000000000000000000000000000000000000008000cccccc")
         elif type_name == "float512":
-            # Based on PREDA spec example for float512(1.0)
+            # Based on GCL spec example for float512(1.0)
             if value == 1.0:
                 return bytes.fromhex("41feffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000000000")
         elif type_name == "float1024":
-            # TODO: Add proper float1024(1.0) example from PREDA spec
+            # TODO: Add proper float1024(1.0) example from GCL spec
             if value == 1.0:
                 # Placeholder: pad with zeros for now
                 return b'\x00' * byte_size
@@ -356,7 +356,7 @@ class PredaSerializer:
         byte_size = self._fixed_type_sizes[type_name]
         self._check_data_length(data, offset, byte_size)
 
-        # TODO: Implement proper PREDA float deserialization
+        # TODO: Implement proper GCL float deserialization
         # For now, check for known values from spec
         float_data = data[offset:offset + byte_size]
 
@@ -369,7 +369,7 @@ class PredaSerializer:
             if float_data == expected_1_0:
                 return 1.0, offset + byte_size
         elif type_name == "float1024":
-            # TODO: Add proper float1024(1.0) example from PREDA spec
+            # TODO: Add proper float1024(1.0) example from GCL spec
             # For now, check for zero bytes (placeholder)
             if float_data == b'\x00' * byte_size:
                 return 0.0, offset + byte_size
@@ -508,7 +508,7 @@ class PredaSerializer:
         return result, current_offset
 
     def _serialize_struct(self, type_name: str, value: dict) -> bytes:
-        """Serialize struct type according to PREDA format."""
+        """Serialize struct type according to GCL format."""
         if not isinstance(value, dict):
             raise TypeValidationError(f"Expected dict for struct, got {type(value)}")
 
@@ -518,7 +518,7 @@ class PredaSerializer:
         if len(value) != len(member_types):
             raise TypeValidationError(f"Struct member count mismatch: expected {len(member_types)}, got {len(value)}")
 
-        # Calculate member count with PREDA format: (count << 4) | 3
+        # Calculate member count with GCL format: (count << 4) | 3
         member_count = len(member_types)
         header = (member_count << 4) | 3
         result = header.to_bytes(4, byteorder='little')
@@ -549,7 +549,7 @@ class PredaSerializer:
         return result
 
     def _deserialize_struct(self, type_name: str, data: bytes, offset: int) -> Tuple[dict, int]:
-        """Deserialize struct type according to PREDA format."""
+        """Deserialize struct type according to GCL format."""
         self._check_data_length(data, offset, 4)
 
         # Read header: (count << 4) | 3
@@ -677,14 +677,14 @@ class PredaSerializer:
 
 
 # Global serializer instance
-_serializer = PredaSerializer()
+_serializer = GclSerializer()
 
 
 def serialize(type_name: str, value: Any) -> bytes:
-    """Serialize a value according to its PREDA type."""
+    """Serialize a value according to its GCL type."""
     return _serializer.serialize(type_name, value)
 
 
 def deserialize(type_name: str, data: bytes, offset: int = 0) -> Tuple[Any, int]:
-    """Deserialize data according to its PREDA type."""
+    """Deserialize data according to its GCL type."""
     return _serializer.deserialize(type_name, data, offset)

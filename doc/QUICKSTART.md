@@ -182,8 +182,8 @@ The SDK connects to a Dioxide node. Default configuration is in:
 
 ```python
 class Config:
-    rpc_url = "http://127.0.0.1:45678/api"      # HTTP RPC endpoint
-    ws_rpc = "ws://127.0.0.1:45678/api"         # WebSocket endpoint
+    rpc_url = "http://127.0.0.1:62222/api"      # HTTP RPC endpoint
+    ws_rpc = "ws://127.0.0.1:62222/api"         # WebSocket endpoint
     log_dir = "logs"                            # Log directory
     default_thread_nums = 32                    # Thread pool size
 ```
@@ -256,7 +256,7 @@ If `demo.py` fails with connection errors:
 
 **1. Check if node is running:**
 ```bash
-netstat -tuln | grep 45678
+netstat -tuln | grep 62222
 ```
 
 **2. Verify node URL in config:**
@@ -265,7 +265,7 @@ netstat -tuln | grep 45678
 
 **3. Test node manually:**
 ```bash
-curl http://127.0.0.1:45678/api
+curl http://127.0.0.1:62222/api
 ```
 
 ### Import errors after updating code

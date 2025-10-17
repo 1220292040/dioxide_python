@@ -26,8 +26,8 @@ Main client for interacting with Dioxide blockchain.
 from dioxide_python_sdk.client.dioxclient import DioxClient
 
 client = DioxClient(
-    url="http://127.0.0.1:45678/api",  # Optional, default from config
-    ws_url="ws://127.0.0.1:45678/api"   # Optional, default from config
+    url="http://127.0.0.1:62222/api",  # Optional, default from config
+    ws_url="ws://127.0.0.1:62222/api"   # Optional, default from config
 )
 ```
 

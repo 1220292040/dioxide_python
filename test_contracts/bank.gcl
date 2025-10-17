@@ -17,15 +17,17 @@ contract Bank {
     @address function uint32 get() public export{
         return balance;
     }
-    
+
     @address function add(uint32 amount) public{
         __debug.assert(__transaction.get_sender() == controller);
         balance += amount;
+        __debug.print("balance:",balance);
     }
 
     @address function sub(uint32 amount) public{
         __debug.assert(__transaction.get_sender() == controller);
         __debug.assert(amount <= balance);
         balance -= amount;
+        __debug.print("balance:",balance);
     }
 }
