@@ -103,6 +103,8 @@ class PredaSerializer:
         elif type_name.startswith("map<"):
             key_type, value_type = self._extract_map_types(type_name)
             return self._serialize_map(key_type, value_type, value)
+        elif type_name.startswith("struct<"):
+            return self._serialize_struct(type_name, value)
         else:
             raise UnsupportedTypeError(f"Unsupported type: {type_name}")
 
@@ -132,6 +134,8 @@ class PredaSerializer:
         elif type_name.startswith("map<"):
             key_type, value_type = self._extract_map_types(type_name)
             return self._deserialize_map(key_type, value_type, data, offset)
+        elif type_name.startswith("struct<"):
+            return self._deserialize_struct(type_name, data, offset)
         else:
             raise UnsupportedTypeError(f"Unsupported type: {type_name}")
 
@@ -182,6 +186,11 @@ class PredaSerializer:
             # Based on PREDA spec example for float512(1.0)
             if value == 1.0:
                 return bytes.fromhex("41feffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000000000")
+        elif type_name == "float1024":
+            # TODO: Add proper float1024(1.0) example from PREDA spec
+            if value == 1.0:
+                # Placeholder: pad with zeros for now
+                return b'\x00' * byte_size
 
         # Fallback: pad with zeros for now
         return b'\x00' * byte_size
@@ -256,15 +265,46 @@ class PredaSerializer:
         return id_bytes + amount_bytes
 
     def _serialize_array(self, element_type: str, value: list) -> bytes:
-        """Serialize array type (4 bytes length + elements)."""
+        """Serialize array type (4 bytes length + elements or length + offset + elements)."""
         if not isinstance(value, list):
             raise TypeValidationError(f"Expected list, got {type(value)}")
 
         length = len(value)
         result = length.to_bytes(4, byteorder='little')
 
-        for element in value:
-            result += self.serialize(element_type, element)
+        # Check if element type is variable-size (unfixed-size)
+        if self._is_variable_size_type(element_type):
+            # Use offset layout: length + offset + elements
+            if length == 0:
+                return result
+
+            # Calculate offsets
+            element_data = []
+            for element in value:
+                element_bytes = self.serialize(element_type, element)
+                element_data.append(element_bytes)
+
+            # Calculate offsets from start of offset table (not from elements start)
+            # Offset is distance from "start of offset table" to "end of current element"
+            offset_table_start = 4  # length is 4 bytes
+            offsets = []
+            current_offset = length * 4  # Start after offset table
+
+            for elem_bytes in element_data:
+                current_offset += len(elem_bytes)
+                offsets.append(current_offset)
+
+            # Add offset table
+            for offset in offsets:
+                result += offset.to_bytes(4, byteorder='little')
+
+            # Add elements
+            for elem_bytes in element_data:
+                result += elem_bytes
+        else:
+            # Use simple layout: length + elements
+            for element in value:
+                result += self.serialize(element_type, element)
 
         return result
 
@@ -328,6 +368,11 @@ class PredaSerializer:
             expected_1_0 = bytes.fromhex("41feffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000000000")
             if float_data == expected_1_0:
                 return 1.0, offset + byte_size
+        elif type_name == "float1024":
+            # TODO: Add proper float1024(1.0) example from PREDA spec
+            # For now, check for zero bytes (placeholder)
+            if float_data == b'\x00' * byte_size:
+                return 0.0, offset + byte_size
 
         # Fallback: return 0.0 for unknown values
         return 0.0, offset + byte_size
@@ -398,10 +443,45 @@ class PredaSerializer:
         length = int.from_bytes(data[offset:offset + 4], byteorder='little')
         current_offset = offset + 4
 
-        elements = []
-        for _ in range(length):
-            element, current_offset = self.deserialize(element_type, data, current_offset)
-            elements.append(element)
+        if length == 0:
+            return [], current_offset
+
+        # Check if element type is variable-size (unfixed-size)
+        if self._is_variable_size_type(element_type):
+            # Use offset layout: length + offset + elements
+            # Read offset table
+            self._check_data_length(data, current_offset, length * 4)
+            offsets = []
+            for i in range(length):
+                offset_val = int.from_bytes(data[current_offset:current_offset + 4], byteorder='little')
+                offsets.append(offset_val)
+                current_offset += 4
+
+            # Read elements using offsets
+            # Offset is distance from "start of offset table" to "end of current element"
+            elements = []
+            elements_start = current_offset
+            for i in range(length):
+                if i == 0:
+                    element_start = 0
+                else:
+                    element_start = offsets[i - 1] - (length * 4)  # Convert to relative offset
+
+                element_end = offsets[i] - (length * 4)  # Convert to relative offset
+
+                element_data = data[elements_start + element_start:elements_start + element_end]
+                element, _ = self.deserialize(element_type, element_data, 0)
+                elements.append(element)
+
+            # Update current_offset to end of last element
+            if length > 0:
+                current_offset = elements_start + offsets[-1] - (length * 4)
+        else:
+            # Use simple layout: length + elements
+            elements = []
+            for _ in range(length):
+                element, current_offset = self.deserialize(element_type, data, current_offset)
+                elements.append(element)
 
         return elements, current_offset
 
@@ -426,6 +506,125 @@ class PredaSerializer:
 
         result = dict(zip(keys, values))
         return result, current_offset
+
+    def _serialize_struct(self, type_name: str, value: dict) -> bytes:
+        """Serialize struct type according to PREDA format."""
+        if not isinstance(value, dict):
+            raise TypeValidationError(f"Expected dict for struct, got {type(value)}")
+
+        # Extract member types from struct<type1,type2,...> format
+        member_types = self._extract_struct_member_types(type_name)
+
+        if len(value) != len(member_types):
+            raise TypeValidationError(f"Struct member count mismatch: expected {len(member_types)}, got {len(value)}")
+
+        # Calculate member count with PREDA format: (count << 4) | 3
+        member_count = len(member_types)
+        header = (member_count << 4) | 3
+        result = header.to_bytes(4, byteorder='little')
+
+        if member_count == 0:
+            return result
+
+        # Calculate offsets and serialize members
+        offsets = []
+        member_data = bytearray()
+        offset_table_size = member_count * 4
+        current_offset = offset_table_size  # Start after offset table
+
+        for i, member_type in enumerate(member_types):
+            member_value = value[f"member_{i}"]  # Assume members are named member_0, member_1, etc.
+            member_bytes = self.serialize(member_type, member_value)
+            member_data.extend(member_bytes)
+            current_offset += len(member_bytes)
+            offsets.append(current_offset)
+
+        # Add offset table
+        for offset in offsets:
+            result += offset.to_bytes(4, byteorder='little')
+
+        # Add member data
+        result += member_data
+
+        return result
+
+    def _deserialize_struct(self, type_name: str, data: bytes, offset: int) -> Tuple[dict, int]:
+        """Deserialize struct type according to PREDA format."""
+        self._check_data_length(data, offset, 4)
+
+        # Read header: (count << 4) | 3
+        header = int.from_bytes(data[offset:offset + 4], byteorder='little')
+        member_count = header >> 4
+        current_offset = offset + 4
+
+        if member_count == 0:
+            return {}, current_offset
+
+        # Extract member types
+        member_types = self._extract_struct_member_types(type_name)
+
+        if member_count != len(member_types):
+            raise DeserializationError(f"Struct member count mismatch: expected {len(member_types)}, got {member_count}")
+
+        # Read offset table
+        self._check_data_length(data, current_offset, member_count * 4)
+        offsets = []
+        for i in range(member_count):
+            offset_val = int.from_bytes(data[current_offset:current_offset + 4], byteorder='little')
+            offsets.append(offset_val)
+            current_offset += 4
+
+        # Read members using offsets
+        members = {}
+        members_start = current_offset
+        for i in range(member_count):
+            if i == 0:
+                member_start = 0
+            else:
+                member_start = offsets[i - 1] - (member_count * 4)  # Convert to relative offset
+
+            member_end = offsets[i] - (member_count * 4)  # Convert to relative offset
+            member_data = data[members_start + member_start:members_start + member_end]
+
+            member_type = member_types[i]
+            member_value, _ = self.deserialize(member_type, member_data, 0)
+            members[f"member_{i}"] = member_value
+
+        # Update current_offset to end of last member
+        if member_count > 0:
+            current_offset = members_start + offsets[-1] - (member_count * 4)
+
+        return members, current_offset
+
+    def _extract_struct_member_types(self, struct_type: str) -> List[str]:
+        """Extract member types from struct<type1,type2,...> format."""
+        if not struct_type.startswith("struct<") or not struct_type.endswith(">"):
+            raise UnsupportedTypeError(f"Invalid struct type format: {struct_type}")
+
+        inner = struct_type[7:-1]  # Remove "struct<" and ">"
+        if not inner.strip():
+            return []
+
+        # Split by comma, but be careful with nested types
+        member_types = []
+        current_type = ""
+        depth = 0
+
+        for char in inner:
+            if char == '<':
+                depth += 1
+            elif char == '>':
+                depth -= 1
+            elif char == ',' and depth == 0:
+                member_types.append(current_type.strip())
+                current_type = ""
+                continue
+            current_type += char
+
+        if current_type.strip():
+            member_types.append(current_type.strip())
+
+        return member_types
 
     # Helper methods
 
@@ -460,6 +659,13 @@ class PredaSerializer:
         key_type = inner[:comma_pos].strip()
         value_type = inner[comma_pos + 1:].strip()
         return key_type, value_type
+
+    def _is_variable_size_type(self, type_name: str) -> bool:
+        """Check if type is variable-size (unfixed-size)."""
+        return (type_name.startswith("array<") or
+                type_name.startswith("map<") or
+                type_name.startswith("struct<") or
+                type_name in ["string", "bigint", "token"])
 
     def _check_data_length(self, data: bytes, offset: int, required_length: int):
         """Check if data has sufficient length."""

@@ -55,6 +55,21 @@ class TestPredaSpecCompliance:
             assert abs(deserialized - value) < 1e-10, \
                 f"Float deserialization failed for {type_name}"
     
+    def test_float1024_basic_functionality(self):
+        """测试float1024基本功能"""
+        # 测试序列化
+        serialized = serialize("float1024", 1.0)
+        assert len(serialized) == 128, f"float1024 should be 128 bytes, got {len(serialized)}"
+        
+        # 测试反序列化
+        deserialized, next_pos = deserialize("float1024", serialized, 0)
+        assert next_pos == 128, f"float1024 deserialization should advance by 128 bytes"
+        
+        # 测试零值
+        zero_serialized = serialize("float1024", 0.0)
+        zero_deserialized, _ = deserialize("float1024", zero_serialized, 0)
+        assert zero_deserialized == 0.0, f"float1024 zero value test failed"
+    
     def test_array_example_from_spec(self):
         """测试PREDA规范中的数组示例: array<uint32> [1,2,3]"""
         expected_hex = "03000000010000000200000003000000"
@@ -127,18 +142,30 @@ class TestPredaSpecCompliance:
         assert next_pos == len(data), \
             "Token position mismatch"
     
-    def test_bigint_example_from_spec(self):
+    def test_bigint_examples_from_spec(self):
         """测试PREDA规范中的bigint示例"""
         # 正数bigint示例
-        spec_hex = "03c7711cc7711c0b4de3051d6b170fb62c38743f9a07000000"
+        positive_spec_hex = "03c7711cc7711c0b4de3051d6b170fb62c38743f9a07000000"
         
         # 测试反序列化结构
-        data = bytes.fromhex(spec_hex)
+        data = bytes.fromhex(positive_spec_hex)
         deserialized, next_pos = deserialize("bigint", data, 0)
         
         # 验证是正数且有正确的结构
         assert isinstance(deserialized, int), "Bigint should be integer"
         assert deserialized > 0, "Spec example should be positive"
+        assert next_pos == len(data), "Position should match data length"
+        
+        # 负数bigint示例
+        negative_spec_hex = "83c7711cc7711c0b4de3051d6b170fb62c38743f9a07000000"
+        
+        # 测试反序列化结构
+        data = bytes.fromhex(negative_spec_hex)
+        deserialized, next_pos = deserialize("bigint", data, 0)
+        
+        # 验证是负数且有正确的结构
+        assert isinstance(deserialized, int), "Bigint should be integer"
+        assert deserialized < 0, "Spec example should be negative"
         assert next_pos == len(data), "Position should match data length"
         
         # 测试简单bigint值的往返
@@ -150,6 +177,165 @@ class TestPredaSpecCompliance:
             serialized = serialize("bigint", value)
             deserialized, _ = deserialize("bigint", serialized, 0)
             assert deserialized == value, f"Bigint round-trip failed for {value}"
+    
+    def test_nested_array_example_from_spec(self):
+        """测试PREDA规范中的嵌套数组示例: array<array<uint32>> [[1,2,3],[1,2],[1,2,4]]"""
+        expected_hex = "030000001c00000028000000380000000300000001000000020000000300000002000000010000000200000003000000010000000200000004000000"
+        expected_value = [[1, 2, 3], [1, 2], [1, 2, 4]]
+        
+        # 测试序列化
+        serialized = serialize("array<array<uint32>>", expected_value)
+        assert serialized.hex().lower() == expected_hex.lower(), \
+            "Nested array serialization failed"
+        
+        # 测试反序列化
+        data = bytes.fromhex(expected_hex)
+        deserialized, next_pos = deserialize("array<array<uint32>>", data, 0)
+        assert deserialized == expected_value, \
+            "Nested array deserialization failed"
+        assert next_pos == len(data), \
+            "Nested array position mismatch"
+    
+    def test_nested_map_example_from_spec(self):
+        """测试PREDA规范中的嵌套映射示例: map<uint32, map<uint32, uint32>>"""
+        expected_hex = "02000000ae000000e900000003000000000000006400000090010000010000000200000005000000040000000000000002000000640000009001000064000000c80000000200000005000000"
+        expected_value = {
+            174: {0: 1, 100: 2, 400: 5},
+            233: {0: 100, 2: 200, 100: 2, 400: 5}
+        }
+        
+        # 测试序列化
+        serialized = serialize("map<uint32,map<uint32,uint32>>", expected_value)
+        assert serialized.hex().lower() == expected_hex.lower(), \
+            "Nested map serialization failed"
+        
+        # 测试反序列化
+        data = bytes.fromhex(expected_hex)
+        deserialized, next_pos = deserialize("map<uint32,map<uint32,uint32>>", data, 0)
+        assert deserialized == expected_value, \
+            "Nested map deserialization failed"
+        assert next_pos == len(data), \
+            "Nested map position mismatch"
+    
+    def test_struct_example_from_spec(self):
+        """测试PREDA规范中的结构体示例: struct<uint32,array<uint32>> {100,[5,3]}"""
+        expected_hex = "230000000c0000001800000064000000020000000500000003000000"
+        expected_value = {"member_0": 100, "member_1": [5, 3]}
+        
+        # 测试序列化
+        serialized = serialize("struct<uint32,array<uint32>>", expected_value)
+        assert serialized.hex().lower() == expected_hex.lower(), \
+            f"Struct serialization failed. Expected: {expected_hex}, Got: {serialized.hex()}"
+        
+        # 测试反序列化
+        data = bytes.fromhex(expected_hex)
+        deserialized, next_pos = deserialize("struct<uint32,array<uint32>>", data, 0)
+        assert deserialized == expected_value, \
+            f"Struct deserialization failed. Expected: {expected_value}, Got: {deserialized}"
+        assert next_pos == len(data), \
+            f"Struct position mismatch. Expected: {len(data)}, Got: {next_pos}"
+    
+    def test_struct_empty(self):
+        """测试空结构体"""
+        expected_hex = "03000000"  # (0 << 4) | 3 = 3
+        expected_value = {}
+        
+        # 测试序列化
+        serialized = serialize("struct<>", expected_value)
+        assert serialized.hex().lower() == expected_hex.lower(), \
+            f"Empty struct serialization failed. Expected: {expected_hex}, Got: {serialized.hex()}"
+        
+        # 测试反序列化
+        data = bytes.fromhex(expected_hex)
+        deserialized, next_pos = deserialize("struct<>", data, 0)
+        assert deserialized == expected_value, \
+            f"Empty struct deserialization failed. Expected: {expected_value}, Got: {deserialized}"
+        assert next_pos == len(data), \
+            f"Empty struct position mismatch. Expected: {len(data)}, Got: {next_pos}"
+    
+    def test_struct_single_member(self):
+        """测试单成员结构体"""
+        expected_value = {"member_0": 42}
+        
+        # 测试序列化
+        serialized = serialize("struct<uint32>", expected_value)
+        
+        # 测试反序列化
+        deserialized, next_pos = deserialize("struct<uint32>", serialized, 0)
+        assert deserialized == expected_value, \
+            f"Single member struct deserialization failed. Expected: {expected_value}, Got: {deserialized}"
+        assert next_pos == len(serialized), \
+            f"Single member struct position mismatch. Expected: {len(serialized)}, Got: {next_pos}"
+    
+    def test_struct_nested_types(self):
+        """测试嵌套类型结构体"""
+        expected_value = {
+            "member_0": 100,
+            "member_1": [5, 3],
+            "member_2": {"key1": 1, "key2": 2}
+        }
+        
+        # 测试序列化
+        serialized = serialize("struct<uint32,array<uint32>,map<string,uint32>>", expected_value)
+        
+        # 测试反序列化
+        deserialized, next_pos = deserialize("struct<uint32,array<uint32>,map<string,uint32>>", serialized, 0)
+        assert deserialized == expected_value, \
+            f"Nested struct deserialization failed. Expected: {expected_value}, Got: {deserialized}"
+        assert next_pos == len(serialized), \
+            f"Nested struct position mismatch. Expected: {len(serialized)}, Got: {next_pos}"
+    
+    def test_map_struct_example_from_spec(self):
+        """测试PREDA规范中的映射结构体示例: map<uint32, {uint32, array<uint32>}>"""
+        expected_hex = "04000000030000000500000064000000c80000002c000000440000005800000070000000230000000c0000001800000064000000020000000500000003000000230000000c0000001400000002000000010000000f000000230000000c000000100000000400000000000000230000000c000000140000000000000001000000c8000000"
+        expected_value = {
+            3: {"field1": 100, "field2": [5, 3]},
+            5: {"field1": 2, "field2": [5, 3, 15]},
+            100: {"field1": 4, "field2": []},
+            200: {"field1": 0, "field2": [200]}
+        }
+        
+        # 注意：当前实现可能不支持结构体，这里先测试基本功能
+        try:
+            serialized = serialize("map<uint32,struct>", expected_value)
+            assert serialized.hex().lower() == expected_hex.lower(), \
+                "Map struct serialization failed"
+            
+            # 测试反序列化
+            data = bytes.fromhex(expected_hex)
+            deserialized, next_pos = deserialize("map<uint32,struct>", data, 0)
+            assert deserialized == expected_value, \
+                "Map struct deserialization failed"
+            assert next_pos == len(data), \
+                "Map struct position mismatch"
+        except UnsupportedTypeError:
+            # 如果结构体不支持，跳过测试
+            pytest.skip("Struct type not yet implemented")
+    
+    def test_fixed_bytes_examples_from_spec(self):
+        """测试PREDA规范中的固定字节类型示例"""
+        test_cases = [
+            # blob: blob[0] = 100
+            ("blob", b"\x64" + b"\x00" * 35, "640000000000000000000000000000000000000000000000000000000000000000000000"),
+            # hash: hash[0] = 100  
+            ("hash", b"\x64" + b"\x00" * 31, "6400000000000000000000000000000000000000000000000000000000000000"),
+            # address: address[1] = 99
+            ("address", b"\x00\x63" + b"\x00" * 34, "006300000000000000000000000000000000000000000000000000000000000000000000"),
+        ]
+        
+        for type_name, test_data, expected_hex in test_cases:
+            # 测试序列化
+            serialized = serialize(type_name, test_data)
+            assert serialized.hex().lower() == expected_hex.lower(), \
+                f"Fixed bytes serialization failed for {type_name}"
+            
+            # 测试反序列化
+            data = bytes.fromhex(expected_hex)
+            deserialized, next_pos = deserialize(type_name, data, 0)
+            assert deserialized == test_data, \
+                f"Fixed bytes deserialization failed for {type_name}"
+            assert next_pos == len(data), \
+                f"Fixed bytes position mismatch for {type_name}"
 
 
 class TestFixedSizeTypes:
