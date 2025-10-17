@@ -1,9 +1,51 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
-logs/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
 build/
-dioxide_python_sdk.egg-info/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Poetry
+.venv/
+poetry.lock
+
+# Logs
+logs/
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE
 .vscode/
-dioxide_python.code-workspace
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.cursor/
+*.code-workspace
+
+# Project specific
 cspell.config.yaml
-.cursor
+test_contracts/*.html
+test_contracts/*.log
