@@ -1,10 +1,13 @@
-.PHONY: help install-poetry install test test-all test-account test-block test-contract test-serialization demo run clean format lint gitignore check-gitignore
+.PHONY: help install-poetry install update shell show-deps test test-all test-account test-block test-contract test-serialization demo run clean format lint check-gitignore
 
 help:
 	@echo "Dioxide Python SDK - Makefile Commands"
 	@echo "======================================"
 	@echo "install-poetry  - Install Poetry package manager"
-	@echo "install         - Install project dependencies using Poetry"
+	@echo "install         - Install project dependencies"
+	@echo "update          - Update dependencies"
+	@echo "shell           - Activate virtual environment"
+	@echo "show-deps       - Show installed dependencies"
 	@echo "test            - Run all tests in tests/ directory"
 	@echo "test-all        - Run all tests (alias for test)"
 	@echo "test-account    - Run account tests"
@@ -29,6 +32,19 @@ install: install-poetry
 	@echo "Installing dependencies..."
 	@poetry install
 	@echo "Dependencies installed successfully!"
+
+update: install-poetry
+	@echo "Updating dependencies..."
+	@poetry update
+	@echo "Dependencies updated successfully!"
+
+shell: install-poetry
+	@echo "Activating virtual environment..."
+	@poetry shell
+
+show-deps: install-poetry
+	@echo "Installed dependencies:"
+	@poetry show
 
 test:
 	@echo "Running all tests..."
