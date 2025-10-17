@@ -1,7 +1,0 @@
-crc32c==2.7.post1
-ed25519==1.5
-krock32==0.1.1
-python_box==7.2.0
-requests==2.32.3
-setuptools==75.6.0
-websockets==11.0.3

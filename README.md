@@ -1,109 +1,105 @@
 # Dioxide Python SDK
-Welcome to Dioxide Python SDK! This SDK provides developers with a set of tools and functionalities to simplify your development process in dioxide.
 
-## Install
-```shell
+Python SDK for interacting with Dioxide blockchain network.
+
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+## Features
+
+- **Account Management**: Create and manage Ed25519 accounts
+- **Transaction Operations**: Send, compose, and sign transactions
+- **Contract Deployment**: Deploy and interact with smart contracts
+- **State Queries**: Query on-chain state and contract information
+- **Real-time Subscriptions**: Subscribe to blockchain events via WebSocket
+- **DApp Management**: Create and manage decentralized applications
+- **Token Operations**: Mint, transfer, and manage tokens
+
+## Quick Start
+
+### Setup
+
+```bash
+# Clone repository
 git clone https://github.com/1220292040/dioxide_python.git
 cd dioxide_python
-pip install -r requirements.txt
-pip install .
+
+# Install dependencies
+make install
 ```
-## Features
-- Feature 1: get on-chain infos by sdk
-> With SDK, you can access a variety of on-chain information, such as transactions, blocks, shard index, contract state and more.
 
-- Feature 2: create an account, compose or sign transactions
-> With SDK, you can also create a valid account, and send transactions.
+This sets up the development environment and installs all dependencies via Poetry.
 
-## Usage
-in your project, you can use sdk as :
+### Basic Usage
 
-python demo.py
 ```python
-# demo.py
-
 from dioxide_python_sdk.client.dioxclient import DioxClient
 from dioxide_python_sdk.client.account import DioxAccount
-from dioxide_python_sdk.client.contract import Scope
-from dioxide_python_sdk.utils.gadget import title_info
 
+# Connect to node
 client = DioxClient()
 
-# #create an account
-title_info("create an account")
-pk = "WTKi+W99TEEt153Zt8isUznwXqYkA0aVWEbd7edk6AvivGov5hBLJLQbS2hk8bnC3FM8Et6+Axaw1uukce+ZEQ=="
-account = DioxAccount.from_key(pk)
-print(account)
+# Create account
+account = DioxAccount.generate_key_pair()
 
-# # mint some tokens
-title_info("mint some tokens")
-print(client.mint_dio(account, 10**18))
+# Get chain info
+overview = client.get_overview()
+print(f"Block height: {overview['HeadHeight']}")
+```
 
-dapp_name = "00Dapp"
-bank_contract_name = "Bank"
-ens_contract_name = "ENS"
+## Documentation
 
-# Create dapp
-title_info("create dapp")
-tx_hash, _ = client.create_dapp(account, dapp_name, 10**12)
-print(tx_hash)
+- [Quick Start Guide](doc/QUICKSTART.md) - Setup and getting started tutorial
+- [API Reference](doc/API_REFERENCE.md) - Complete API documentation
 
-# order by contracts
-constructors = [{"_owner":account.address},None,{"_owner":account.address}]
+## Project Structure
 
-# #deploy contract / contracts
-title_info("deploy contract / contracts")
-client.deploy_contracts(dapp_name=dapp_name,delegator=account,dir_path="./test_contracts",construct_args=constructors,compile_time=10)
+```
+dioxide_python/
+├── dioxide_python_sdk/   # SDK source code
+│   ├── client/          # Client and account management
+│   ├── config/          # Configuration
+│   └── utils/           # Utility functions
+├── tests/               # Test scripts
+├── doc/                 # Documentation
+├── demo.py              # Demo script
+└── Makefile             # Build automation
+```
 
-# #contract info
-title_info("contract info")
-contract_info = client.get_contract_info(dapp_name,bank_contract_name)
-print(contract_info)
+## Development
 
-#invoke contract
-title_info("invoke contract")
-client.send_transaction(account,"{}.{}.{}".format(dapp_name,ens_contract_name,"set_ens"),{"_cid":287764905985},is_sync=True)
-client.send_transaction(account,"{}.{}.{}".format(dapp_name,bank_contract_name,"set_authority"),{"_controller":"0x0000004300200001:contract"},is_sync=True)
-client.send_transaction(account,"{}.{}.{}".format(dapp_name,ens_contract_name,"invoke"),{"operation":"deposit","amount":1000},is_sync=True)
-print(client.get_contract_state(dapp_name,bank_contract_name,Scope.Address,account.address))
+```bash
+# Run demo
+make demo
 
-tx_hash = client.send_transaction(account,"{}.{}.{}".format(dapp_name,ens_contract_name,"invoke"),{"operation":"withdraw","amount":100},is_sync=True)
-print(client.get_contract_state(dapp_name,bank_contract_name,Scope.Address,account.address))
+# Run tests
+make test
 
-#get event
-title_info("filter contract event")
-events = client.get_events_by_transaction(tx_hash)
-for event in events:
-    print(f"name: {event.Target}")
-    print(f"input: {event.Input}")
-    #parse input args TODO
+# Clean project
+make clean
+```
 
-# title_info("get_overview")
-# print(client.get_overview())
+## Requirements
 
-# title_info("get_block_number")
-# print(client.get_block_number())
+- Python 3.9+
+- Poetry (for dependency management)
+- Running Dioxide node
 
-# title_info("get_shard_index")
-# print(client.get_shard_index("global",None))
-# print(client.get_shard_index("shard",0))
-# print(client.get_shard_index("address","zcnfcepb0nqe6x1syaqrwpxq6y60f7kzp458380616rqqtksdfc26pvh1c:ed25519"))
-# print(client.get_shard_index("uint256","234"))
+## Contributing
 
-# title_info("get_isn")
-# print(client.get_isn("zcnfcepb0nqe6x1syaqrwpxq6y60f7kzp458380616rqqtksdfc26pvh1c:ed25519"))
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-# title_info("get_consensus_header_by_height")
-# print(client.get_consensus_header_by_height(50))
+## License
 
-# title_info("get_consensus_header_by_hash")
-# print(client.get_consensus_header_by_hash("2x7jt9mckbtyakramr78j8q0y7aey2v1hshct59yxynryddev3d0"))
+MIT License
 
-# title_info("get_transaction_block_by_height")
-# print(client.get_transaction_block_by_height(1,50))
+## Links
 
-# title_info("get_transaction_block_by_hash")
-# print(client.get_transaction_block_by_hash(1,"emybse4q65g1xfjvz9fk50fqh5vcb1hnm1zmmz67xxv5krtf5s60"))
+- [GitHub Repository](https://github.com/1220292040/dioxide_python)
+- [Dioxide Documentation](https://dioxide.network)
 
-# title_info("get_transaction")
-# print(client.get_transaction("xn3bm3z0r2pcvqkvmtdasvj993fwr7m0vjtx7eb5zft1x8xprdjg"))
+## Support
+
+For issues and questions:
+- Open an issue on [GitHub](https://github.com/1220292040/dioxide_python/issues)
+- Check existing [documentation](doc/)
