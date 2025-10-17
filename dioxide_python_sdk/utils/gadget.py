@@ -111,14 +111,14 @@ def title_info(msg):
 
 
 """
-deserialized_args will parse serialized args by signature type order using the new PREDA serializer
+deserialized_args will parse serialized args by signature type order using the new GCL serializer
 signature: str  => "<type1>:<name1>:<type2>:<name2>,<type3>:<name3>...<typen>:<namen>"
 for example , in action1(to,1u32,2u32), parse signature: "address:to,uint32:a,uint32:b"
-Now supports all PREDA types including array, map, struct
+Now supports all GCL types including array, map, struct
 """
 def deserialized_args(signature: str, sargs: str, offset: bool = False):
     """
-    Parse serialized arguments using the new PREDA serializer.
+    Parse serialized arguments using the new GCL serializer.
     
     Args:
         signature: Type signature string like "address:to,uint32:a,uint32:b"
@@ -162,7 +162,7 @@ def deserialized_args(signature: str, sargs: str, offset: bool = False):
             name = f"value#{idx}"
 
         try:
-            # Use the new PREDA serializer for all types
+            # Use the new GCL serializer for all types
             value, current_offset = deserialize(type_name, data, current_offset)
             ret[name] = value
 
