@@ -67,7 +67,7 @@ def default_contract_statekey_state_handler(contract_name,statekey,to_handler=de
             for state in r.get(f"{scope}",[]):
                 if state.get("State",None) is not None and \
                     isinstance(state["State"],dict) and \
-                    state["State"].get(statekey,None) != None and \
+                    state["State"].get(statekey,None) is not None and \
                     state.get("Contract",None) is not None and \
                     ".".join(state["Contract"].split(".")[:2]) == contract_name:
                     filtered_msg[f"{scope}"].append(state)
