@@ -1,7 +1,7 @@
 import Controller as ctrl;
 
 contract ENS {
-    
+
     @global address owner;
     @global uint64 cid;
 
@@ -9,9 +9,9 @@ contract ENS {
         owner = _owner;
         __debug.print("ENS id:",__id());
     }
-    
+
     @address function set_ens(uint64 _cid) export {
-        __debug.assert(__transaction.get_sender() == owner);
+        __debug.assert(__transaction.get_sender() == owner, "Only owner can set_ens");
         relay@global(^_cid){
             cid = _cid;
         }
@@ -19,6 +19,8 @@ contract ENS {
 
     @address function invoke(string operation,uint32 amount) export {
         ctrl controller = ctrl(cid);
+        __debug.assert(controller.__valid(), "Controller cid is invalid!");
+
         if(operation == "deposit"){
             controller.deposit(amount);
         }
