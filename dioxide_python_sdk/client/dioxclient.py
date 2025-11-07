@@ -2,24 +2,40 @@
   dioxclientpy is a python client for dioxide node.
   @author: long
   @date: 2024-09-12
-"""  
+"""
 from ..client import clientlogger
 from ..client.stat import StatTool
 from ..config.client_config import Config
 from ..utils.rpc import HTTPProvide
 from ..client.account import DioxAccount,DioxAddress,DioxAddressType
 from ..utils.gadget import exception_handler,get_subscribe_message,progress_bar
-from ..client.filters import *
-from ..client.handlers import *
-from box import Box
+from ..client.filters import (
+    dapp_filter,
+    contract_filter,
+    scopekey_filter,
+    contract_and_scopekey_filter,
+    contract_and_statekey_filter,
+    height_filter,
+    external_relay_filter
+)
+from ..client.handlers import (
+    default_handler,
+    default_dapp_state_handler,
+    default_contract_state_handler,
+    default_scopekey_state_handler,
+    default_contract_scopekey_state_handler,
+    default_contract_statekey_state_handler
+)
+from box import Box  # type: ignore
 from . import types as dioxtypes
 import queue
 import base64
 import time
 import json
 from ..client.contract import Scope
-import os,threading
-import websockets
+import os
+import threading
+import websockets  # type: ignore
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
@@ -47,7 +63,7 @@ class DioxClient:
         self.rpc.logger = self.logger
         self.ws_rpc = ws_url
         self.ws_connections = {}
-        self.loop = asyncio.new_event_loop() 
+        self.loop = asyncio.new_event_loop()
         threading.Thread(target=self.__start_loop, daemon=True).start()
 
     def __start_loop(self):
@@ -74,7 +90,7 @@ class DioxClient:
             return response["ret"]
 
     def error_response(self,response):
-        if response == None:
+        if response is None:
             e = DioxError(-1,"response is None")
             return e
         if("err" in response):
@@ -84,7 +100,7 @@ class DioxClient:
             e = DioxError(code,msg)
             return e
         return None
-    
+
 #rpc method ----------------------------------------------------------------
     """
     @description:
@@ -125,7 +141,7 @@ class DioxClient:
     @exception_handler
     def get_overview(self):
         return self.make_request("dx.overview",{})
-    
+
 
     """
     @description:
@@ -173,7 +189,7 @@ class DioxClient:
         params.update({"address":address})
         response = self.make_request(method,params)
         return int(response["ISN"])
-    
+
     """
     @description:
         根据高度获取consensus_header
@@ -298,7 +314,7 @@ class DioxClient:
         params.update({"hash":hash})
         response = self.make_request(method,params)
         return Box(response,default_box=True)
-    
+
     """
     @description:
         根据交易哈希获取交易
@@ -328,7 +344,7 @@ class DioxClient:
             params.update({"shard_index":shard_index})
         response = self.make_request(method,params)
         return Box(response,default_box=True)
-    
+
     """
     @description:
         合成交易,将交易的各字段合成成字节流形式,后续加入签名后发送到链上
@@ -444,7 +460,7 @@ class DioxClient:
             deploy_args.update({"time":compile_time})
         dapp_address = DioxAddress(None,DioxAddressType.DAPP)
         if not dapp_address.set_delegatee_from_string(dapp_name):
-            raise DioxError(-10002, "invalid dapp name") 
+            raise DioxError(-10002, "invalid dapp name")
         deployed_txn = self.compose_transaction(
             sender=dapp_address.address,
             function="core.delegation.deploy_contracts",
@@ -454,7 +470,7 @@ class DioxClient:
         tx_hash = self.send_raw_transaction(delegator.sign_diox_transaction(deployed_txn),True)
         self.wait_for_deploy(tx_hash)
         return tx_hash
-    
+
     """
     @description:
         批量部署合约
@@ -468,16 +484,79 @@ class DioxClient:
     @response -- str
         合约部署交易哈希
     """
+    def _parse_contract_dependencies(self, contract_files):
+        """Parse import dependencies from contract files"""
+        import re
+        dependencies = {}
+
+        for filepath, filename in contract_files:
+            contract_name = os.path.splitext(filename)[0]
+            dependencies[contract_name] = []
+
+            with open(os.path.join(filepath, filename), 'r') as f:
+                content = f.read()
+                # Parse import statements: import ContractName as alias;
+                imports = re.findall(r'import\s+(\w+)\s+as\s+\w+;', content)
+                # Normalize to lowercase for case-insensitive matching
+                dependencies[contract_name] = [imp.lower() for imp in imports]
+
+        return dependencies
+
+    def _topological_sort(self, dependencies):
+        """
+        Topological sort: contracts with no dependencies first,
+        then contracts that depend on them
+        """
+        deps_copy = {k: list(v) for k, v in dependencies.items()}
+        sorted_contracts = []
+
+        while deps_copy:
+            # Find contracts with no remaining dependencies
+            ready = [contract for contract, deps in deps_copy.items() if len(deps) == 0]
+
+            if not ready:
+                # Circular dependency or missing contract - deploy remaining in any order
+                ready = list(deps_copy.keys())
+
+            ready.sort()  # Deterministic order
+
+            for contract in ready:
+                sorted_contracts.append(contract)
+                del deps_copy[contract]
+
+                # Remove this contract from other contracts' dependency lists
+                for other_deps in deps_copy.values():
+                    if contract in other_deps:
+                        other_deps.remove(contract)
+
+        return sorted_contracts
+
     @exception_handler
     def deploy_contracts(self,dapp_name,delegator:DioxAccount,dir_path=None,suffix=".gcl",construct_args:list[dict]=None,compile_time=None):
         deploy_args={}
         codes = []
         cargs = []
+        # Collect all matching files
+        contract_files = []
         for filepath,_,filenames in os.walk(dir_path):
             for filename in filenames:
                 if os.path.splitext(filename)[-1] == suffix:
-                    with open(os.path.join(filepath,filename)) as f:
-                        codes.append(f.read())
+                    contract_files.append((filepath, filename))
+
+        # Parse dependencies and sort by dependency order
+        dependencies = self._parse_contract_dependencies(contract_files)
+        sorted_contract_names = self._topological_sort(dependencies)
+
+        # Create a mapping from filename to full path
+        file_map = {os.path.splitext(filename)[0]: (filepath, filename)
+                    for filepath, filename in contract_files}
+
+        # Read files in dependency order
+        for contract_name in sorted_contract_names:
+            if contract_name in file_map:
+                filepath, filename = file_map[contract_name]
+                with open(os.path.join(filepath, filename)) as f:
+                    codes.append(f.read())
         for carg in construct_args:
             if carg is None:
                 cargs.append("")
@@ -489,7 +568,7 @@ class DioxClient:
             deploy_args.update({"time":compile_time})
         dapp_address = DioxAddress(None,DioxAddressType.DAPP)
         if not dapp_address.set_delegatee_from_string(dapp_name):
-            raise DioxError(-10002, "invalid dapp name") 
+            raise DioxError(-10002, "invalid dapp name")
         deployed_txn = self.compose_transaction(
             sender=dapp_address.address,
             function="core.delegation.deploy_contracts",
@@ -590,7 +669,7 @@ class DioxClient:
         thread_id = threading.get_ident()
         asyncio.set_event_loop(self.loop)
         asyncio.run_coroutine_threadsafe(self.__subscribe(topic,thread_id, handler, filter),self.loop)
-    
+
 
     @exception_handler
     def subscribe_state_with_dapp(self,dapp_name,handler=default_handler):
@@ -599,7 +678,7 @@ class DioxClient:
     @exception_handler
     def subscribe_state_with_contract(self,dapp_contract_name,handler=default_handler):
         self.subscribe(dioxtypes.SubscribeTopic.STATE,default_contract_state_handler(dapp_contract_name,handler),contract_filter(dapp_contract_name))
-    
+
     @exception_handler
     def subscribe_state_with_scpoekey(self,scopekey:str,handler=default_handler):
         self.subscribe(dioxtypes.SubscribeTopic.STATE,default_scopekey_state_handler(scopekey,handler),scopekey_filter(scopekey))
@@ -633,7 +712,7 @@ class DioxClient:
         msg = get_subscribe_message(topic)
         await ws.send(msg)
         while ws in self.ws_connections.values():
-            resp = json.loads(await ws.recv())  
+            resp = json.loads(await ws.recv())
             if (handler is not None) and (filter is None or filter(resp)):
                 executor.submit(handler,resp)
 
@@ -641,7 +720,7 @@ class DioxClient:
         await ws.close()
         self.ws_connections.pop(thread_id, None)
 
-    
+
     #wrapper method ----------------------------------------------------------------
     @exception_handler
     def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,gas_price=None,gas_limit=None,is_sync=False,timeout=DEFAULT_TIMEOUT):
@@ -657,7 +736,7 @@ class DioxClient:
         signed_txn = user.sign_diox_transaction(unsigned_txn)
         tx_hash = self.send_raw_transaction(signed_txn,is_sync,timeout)
         return tx_hash
-    
+
     @exception_handler
     def mint_dio(self,user:DioxAccount,amount,sync=True,timeout=DEFAULT_TIMEOUT):
         tx_hash = self.send_transaction(user=user,function="core.coin.mint",args={"Amount":"{}".format(amount)},is_sync=sync,timeout=timeout)
@@ -690,7 +769,7 @@ class DioxClient:
         else:
             ok = None
         return tx_hash,ok
-    
+
     """
     @description:
         创建token
@@ -726,7 +805,7 @@ class DioxClient:
         else:
             ok = None
         return tx_hash,ok
-    
+
 
 
     #aux method ----------------------------------------------------------------
@@ -734,7 +813,7 @@ class DioxClient:
         if tx is None or tx.get("ConfirmState",None) is None :
             return False
         return tx.ConfirmState in dioxtypes.TXN_CONFIRMED_STATUS
-    
+
     def is_tx_success(self,tx):
         if tx is None or \
             tx.get("Invocation",None) is None or \
@@ -777,7 +856,7 @@ class DioxClient:
             return res
         else:
             return None
-    
+
     def wait_for_transaction_confirmed(self,tx_hash,timeout):
         start = time.time()
         tx = self.get_transaction(tx_hash)
@@ -786,7 +865,7 @@ class DioxClient:
                 return False
             time.sleep(1)
         return True
-    
+
     def wait_for_dapp_deployed(self,tx_hash,timeout):
         if self.wait_for_transaction_confirmed(tx_hash,timeout):
             relays = self.get_all_relay_transactions(self.get_transaction(tx_hash),detail=True)
@@ -806,5 +885,4 @@ class DioxClient:
             return True
         else:
             return False
-    
-    
+

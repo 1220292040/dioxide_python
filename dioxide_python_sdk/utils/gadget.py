@@ -1,7 +1,14 @@
 import hashlib,json
 from ..client.types import SubscribeTopic
-import krock32
 import sys
+from .serializer import serialize, deserialize
+
+try:
+    import krock32
+    KROCK32_AVAILABLE = True
+except ImportError:
+    KROCK32_AVAILABLE = False
+    print("Warning: krock32 module not available, some encoding features may be limited")
 
 def exception_handler(func):
     def wrapper(*args, **kwargs):
@@ -22,7 +29,7 @@ class PowDifficulty:
         num = 0x8000000000000000 // denominator
         shift = 64 - num.bit_length()
         num <<= shift
-        
+
         exp = 32 * 8 - 63 - shift
         bytes_needed = exp // 8
         residue = exp % 8
@@ -32,7 +39,7 @@ class PowDifficulty:
 
         self._TargetNum = num >> 32
         self._NonZeroBytes = bytes_needed + 8  # ULONGLONG size
-    
+
     def is_fullfiled(self,val):
         if self._TargetNum <= int.from_bytes(val[self._NonZeroBytes-4:self._NonZeroBytes],'little'):
             return False
@@ -89,14 +96,14 @@ def get_subscribe_message(topic: SubscribeTopic):
         return json.dumps({"req": "subscribe.mempool_insert"})
     else:
         raise ValueError("Invalid topic type")
-    
+
 
 def progress_bar(current, total, title="" ,bar_length=50):
     fraction = min(current / total,1)
     arrow = int(fraction * bar_length - 1) * '=' + '>'
     padding = (bar_length - len(arrow)) * ' '
     progress = f'{title}[{arrow}{padding}] {int(fraction*100)}%'
-    sys.stdout.write('\r' + progress) 
+    sys.stdout.write('\r' + progress)
     sys.stdout.flush()
 
 def title_info(msg):
@@ -104,166 +111,151 @@ def title_info(msg):
 
 
 """
-deserialized_args will parse serialized args by signature type order
+deserialized_args will parse serialized args by signature type order using the new GCL serializer
 signature: str  => "<type1>:<name1>:<type2>:<name2>,<type3>:<name3>...<typen>:<namen>"
 for example , in action1(to,1u32,2u32), parse signature: "address:to,uint32:a,uint32:b"
-Warning!: only support fixed-size (int,float,uint,address,hash..) and bigint,token,string, not support array,map,struct
+Now supports all GCL types including array, map, struct
 """
-def deserialized_args(sigature:str,sargs,offset=False):
-    def parse_uint(type,data,cur):
-        bitwidth = int(type[4:])//8
-        val = int.from_bytes(data[cur:cur+bitwidth],byteorder='little',signed=False)
-        cur += bitwidth
-        return val,cur
+def deserialized_args(signature: str, sargs: str, offset: bool = False):
+    """
+    Parse serialized arguments using the new GCL serializer.
     
-    def parse_int(type,data,cur):
-        bitwidth = int(type[3:])//8
-        val = int.from_bytes(data[cur:cur+bitwidth],byteorder='little',signed=True)
-        cur += bitwidth
-        return val,cur
-
-    def parse_float(type,data,cur):
-        exp_bitwith = 8
-        man_bitwith = int(type[5:])//8-8
-        sign_bitwith = 4
-        exp = int.from_bytes(data[cur:cur+exp_bitwith],byteorder='little',signed=True)
-        cur += exp_bitwith
-
-        pos = 0
-        for i in range(cur,cur+man_bitwith):
-            if data[i] == 0:
-                exp+=8
-            else:
-                pos = i
-                break
-        man = int.from_bytes(data[pos:cur+man_bitwith],byteorder='little',signed=False)
-        val = (2**exp) * man 
-        cur += man_bitwith
-
-        sign = int.from_bytes(data[cur:cur+sign_bitwith],byteorder='little',signed=False) & 128
-        cur += sign_bitwith
-        
-        if sign is True:
-            return val,cur
-        else:
-            return -val,cur
-
-    def parse_bool(data,cur):
-        bitwidth = 1
-        val = data[cur]
-        cur += bitwidth
-        if val != 0:
-            return "true",cur
-        else:
-            return "false",cur
-   
-    def parse_hash(data,cur):
-        bitwidth = 32
-        encoder = krock32.Encoder()
-        encoder.update(data[cur:cur+bitwidth])
-        val = encoder.finalize().lower()
-        cur += bitwidth
-        return val,cur
-
-    def parse_address(data,cur):
-        bitwidth = 36
-        encoder = krock32.Encoder()
-        encoder.update(data[cur:cur+bitwidth])
-        val = encoder.finalize().lower()
-        cur += bitwidth
-        return val,cur
-
-    def parse_string(data,cur):
-        slen = int.from_bytes(data[cur:cur+2],byteorder='little',signed=False)
-        cur += 2
-        val = str(data[cur:cur+slen],encoding='utf-8')
-        cur += slen
-        return val,cur
-
-    def parse_bigint(data,cur):
-        bitmask = int.from_bytes(data[cur:cur+1],byteorder='little',signed=False)
-        cur += 1
-        sig = False if bitmask & 0x80 > 0 else True
-        nlen = bitmask & 0x7f
-        ret = 0
-        base = 2**64
-        for i in range(nlen-1,-1,-1):
-            number = int.from_bytes(data[cur+i*8:cur+(i+1)*8],byteorder='little',signed=False)
-            ret = ret * base + number
-        cur += nlen*8
-        if sig is False:
-            ret = -ret
-        return ret,cur
-
-    def parse_token(data,cur):
-        ret = {}
-        pos = cur+8
-        for i in range(cur,cur+8):
-            if data[i] == 0:
-                pos = i
-                break
-        symbol = str(data[cur:pos],encoding="utf-8")
-        cur += 8
-        ret[symbol],cur = parse_bigint(data,cur)
-        return ret,cur
-
-    def parse_in_type(sig,type):
-        start = type.find(sig)
-        start += len(sig)
-        level = 1
-        content = []
-        for char in type[start:]:
-            if char == '<':
-                level += 1
-            elif char == '>':
-                level -= 1
-                if level == 0:
-                    return ''.join(content)
-            content.append(char)
-        return None
-
+    Args:
+        signature: Type signature string like "address:to,uint32:a,uint32:b"
+        sargs: Hex string of serialized data
+        offset: Whether to return offset information (for backward compatibility)
+    
+    Returns:
+        Dictionary with parsed arguments
+    """
     ret = {}
-    params = sigature.split(",")
     data = bytes.fromhex(sargs)
-    cur = 0
-    idx = 0
-    for param in params:
-        pname_and_type = param.split(":")
-        type = pname_and_type[0].strip()
-        name = "value#"+str(idx)
-        if len(pname_and_type) == 2:
-            name = pname_and_type[1].strip()
-        #fixed-size
-        if type in ["uint8","uint16","uint32","uint64","uint128","uint256","uint512"]:
-            ret[name],cur = parse_uint(type,data,cur)
-            
-        elif type in ["int8","int16","int32","int64","int128","int256","int512"]:
-            ret[name],cur = parse_int(type,data,cur)
+    current_offset = 0
 
-        elif type in ["float256","float512","float1024"]:
-            ret[name],cur = parse_float(type,data,cur)
+    # Parse signature more carefully to handle nested types
+    params = []
+    current_param = ""
+    depth = 0
 
-        elif type == "bool":
-            ret[name],cur = parse_bool(data,cur)
-            
-        elif type == "hash":
-            ret[name],cur = parse_hash(data,cur)
+    for char in signature:
+        if char == '<':
+            depth += 1
+        elif char == '>':
+            depth -= 1
+        elif char == ',' and depth == 0:
+            params.append(current_param.strip())
+            current_param = ""
+            continue
+        current_param += char
 
-        elif type == "address":
-            ret[name],cur = parse_address(data,cur)
-        
-        elif type == "string":
-            ret[name],cur = parse_string(data,cur)
+    if current_param.strip():
+        params.append(current_param.strip())
 
-        elif type == "bigint":
-            ret[name],cur = parse_bigint(data,cur)
-        
-        elif type == "token":
-            ret[name],cur = parse_token(data,cur)
-
+    for idx, param in enumerate(params):
+        # Find the last colon to separate type and name
+        colon_pos = param.rfind(":")
+        if colon_pos != -1:
+            type_name = param[:colon_pos].strip()
+            name = param[colon_pos+1:].strip()
         else:
-            pass
+            type_name = param.strip()
+            name = f"value#{idx}"
 
-        idx += 1
-    
+        try:
+            # Use the new GCL serializer for all types
+            value, current_offset = deserialize(type_name, data, current_offset)
+            ret[name] = value
+
+        except Exception as e:
+            # Fallback to old parsing for backward compatibility
+            print(f"Warning: Failed to parse {type_name} with new serializer: {e}")
+            print(f"Falling back to manual parsing for {type_name}")
+
+            # Try manual parsing for unsupported types
+            try:
+                if type_name in ["uint8","uint16","uint32","uint64","uint128","uint256","uint512"]:
+                    bitwidth = int(type_name[4:])//8
+                    val = int.from_bytes(data[current_offset:current_offset+bitwidth],byteorder='little',signed=False)
+                    current_offset += bitwidth
+                    ret[name] = val
+
+                elif type_name in ["int8","int16","int32","int64","int128","int256","int512"]:
+                    bitwidth = int(type_name[3:])//8
+                    val = int.from_bytes(data[current_offset:current_offset+bitwidth],byteorder='little',signed=True)
+                    current_offset += bitwidth
+                    ret[name] = val
+
+                elif type_name == "bool":
+                    val = data[current_offset] != 0
+                    current_offset += 1
+                    ret[name] = val
+
+                elif type_name == "hash":
+                    bitwidth = 32
+                    if KROCK32_AVAILABLE:
+                        encoder = krock32.Encoder()
+                        encoder.update(data[current_offset:current_offset+bitwidth])
+                        val = encoder.finalize().lower()
+                    else:
+                        # Fallback: return hex string
+                        val = data[current_offset:current_offset+bitwidth].hex()
+                    current_offset += bitwidth
+                    ret[name] = val
+
+                elif type_name == "address":
+                    bitwidth = 36
+                    if KROCK32_AVAILABLE:
+                        encoder = krock32.Encoder()
+                        encoder.update(data[current_offset:current_offset+bitwidth])
+                        val = encoder.finalize().lower()
+                    else:
+                        # Fallback: return hex string
+                        val = data[current_offset:current_offset+bitwidth].hex()
+                    current_offset += bitwidth
+                    ret[name] = val
+
+                elif type_name == "string":
+                    slen = int.from_bytes(data[current_offset:current_offset+2],byteorder='little',signed=False)
+                    current_offset += 2
+                    val = str(data[current_offset:current_offset+slen],encoding='utf-8')
+                    current_offset += slen
+                    ret[name] = val
+
+                elif type_name == "bigint":
+                    bitmask = int.from_bytes(data[current_offset:current_offset+1],byteorder='little',signed=False)
+                    current_offset += 1
+                    sig = False if bitmask & 0x80 > 0 else True
+                    nlen = bitmask & 0x7f
+                    ret_val = 0
+                    base = 2**64
+                    for i in range(nlen-1,-1,-1):
+                        number = int.from_bytes(data[current_offset+i*8:current_offset+(i+1)*8],byteorder='little',signed=False)
+                        ret_val = ret_val * base + number
+                    current_offset += nlen*8
+                    if sig is False:
+                        ret_val = -ret_val
+                    ret[name] = ret_val
+
+                elif type_name == "token":
+                    ret_val = {}
+                    pos = current_offset+8
+                    for i in range(current_offset,current_offset+8):
+                        if data[i] == 0:
+                            pos = i
+                            break
+                    symbol = str(data[current_offset:pos],encoding="utf-8")
+                    current_offset += 8
+                    ret_val[symbol], current_offset = deserialize("bigint", data, current_offset)
+                    ret[name] = ret_val
+
+                else:
+                    print(f"Warning: Unsupported type {type_name}, skipping")
+                    ret[name] = None
+
+            except Exception as fallback_error:
+                print(f"Error in fallback parsing for {type_name}: {fallback_error}")
+                ret[name] = None
+
+    if offset:
+        return ret, current_offset
     return ret

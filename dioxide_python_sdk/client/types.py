@@ -5,8 +5,8 @@ GLOBAL_IDENTIFIER = 65535
 class EngineID(Enum):
 	Core =  1
 	Native = 2
-	PREDA_NATIVE = 3
-	PREDA_WASM = 4
+	GCL_NATIVE = 3
+	GCL_WASM = 4
 	SOLIDITY_EVM = 5
 
 class BlockState(Enum):
@@ -17,7 +17,7 @@ class BlockState(Enum):
     DUS_FINALIZED = 4
     DUS_ARCHIVED = 5
     DUS_ARCHIVED_UNCLE = 6
-    
+
 class BlkCommitState(Enum):
 	BLKCS_INIT = 0			    # init state
 	BLKCS_PENDING_BLOCKID = 1		# parent available but no sufficient block id
