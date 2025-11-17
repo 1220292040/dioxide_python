@@ -747,7 +747,7 @@ class DioxClient:
         args = {
             "To":"{}".format(receiver),
             "Amount":"{}".format(amount),
-            "token":"{}".format(token)
+            "TokenId":"{}".format(token)
         }
         tx_hash = self.send_transaction(user=sender,function="core.wallet.transfer",args=args,is_sync=sync,timeout=timeout)
         return tx_hash
