@@ -482,53 +482,6 @@ class DioxClient:
     @response -- str
         合约部署交易哈希
     """
-    def _parse_contract_dependencies(self, contract_files):
-        """Parse import dependencies from contract files"""
-        import re
-        dependencies = {}
-
-        for filepath, filename in contract_files:
-            contract_name = os.path.splitext(filename)[0]
-            dependencies[contract_name] = []
-
-            with open(os.path.join(filepath, filename), 'r') as f:
-                content = f.read()
-                # Parse import statements: import ContractName as alias;
-                imports = re.findall(r'import\s+(\w+)\s+as\s+\w+;', content)
-                # Normalize to lowercase for case-insensitive matching
-                dependencies[contract_name] = [imp.lower() for imp in imports]
-
-        return dependencies
-
-    def _topological_sort(self, dependencies):
-        """
-        Topological sort: contracts with no dependencies first,
-        then contracts that depend on them
-        """
-        deps_copy = {k: list(v) for k, v in dependencies.items()}
-        sorted_contracts = []
-
-        while deps_copy:
-            # Find contracts with no remaining dependencies
-            ready = [contract for contract, deps in deps_copy.items() if len(deps) == 0]
-
-            if not ready:
-                # Circular dependency or missing contract - deploy remaining in any order
-                ready = list(deps_copy.keys())
-
-            ready.sort()  # Deterministic order
-
-            for contract in ready:
-                sorted_contracts.append(contract)
-                del deps_copy[contract]
-
-                # Remove this contract from other contracts' dependency lists
-                for other_deps in deps_copy.values():
-                    if contract in other_deps:
-                        other_deps.remove(contract)
-
-        return sorted_contracts
-
     @exception_handler
     def deploy_contracts(self,dapp_name,delegator:DioxAccount,contracts:dict[str,dict]=None,compile_time=None):
         deploy_args={}
