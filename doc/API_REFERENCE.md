@@ -274,6 +274,21 @@ info = client.get_contract_info("MyDapp", "MyContract")
 
 **Returns**: `dict` - contract info (ContractID, Code, etc.)
 
+#### get_source_code(dapp_name, contract_name)
+
+Get source code of a deployed contract.
+
+```python
+source_code = client.get_source_code("MyDapp", "MyContract")
+print(source_code)
+```
+
+**Parameters**:
+- `dapp_name` (str): DApp name
+- `contract_name` (str): Contract name
+
+**Returns**: `str` - contract source code
+
 #### deploy_contract(dapp_name, delegator, file_path=None, source_code=None, construct_args=None, compile_time=None)
 
 Deploy a single contract.
