@@ -1,4 +1,5 @@
 import sys
+import os
 sys.path.append('.')
 
 from dioxide_python_sdk.client.dioxclient import DioxClient
@@ -21,16 +22,13 @@ tx_hash,ok = client.create_dapp(tester,dapp_name,10**11)
 print(tx_hash)
 
 if ok:
-    constructors = [
-        {
-            "_owner":"{}".format(tester.address)
-        },
-        None,
-        {
-            "_owner":"{}".format(tester.address)
-        }
-    ]
-    client.deploy_contracts(dapp_name=dapp_name,delegator=tester,dir_path="./test_contracts",construct_args=constructors,compile_time=10)
+    contracts_dir = os.path.abspath("./test_contracts")
+    contracts = {
+        os.path.join(contracts_dir, "bank.gcl"): {"_owner": "{}".format(tester.address)},
+        os.path.join(contracts_dir, "controller.gcl"): None,
+        os.path.join(contracts_dir, "ens.gcl"): {"_owner": "{}".format(tester.address)}
+    }
+    client.deploy_contracts(dapp_name=dapp_name,delegator=tester,contracts=contracts,compile_time=10)
 
     #contract info
     contract_info = client.get_contract_info(dapp_name,bank_contract_name)
