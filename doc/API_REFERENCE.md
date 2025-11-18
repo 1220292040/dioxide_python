@@ -298,20 +298,21 @@ tx_hash = client.deploy_contract(
 
 **Returns**: `str` - deployment transaction hash
 
-#### deploy_contracts(dapp_name, delegator, dir_path=None, suffix=".gcl", construct_args=None, compile_time=None)
+#### deploy_contracts(dapp_name, delegator, contracts=None, compile_time=None)
 
-Deploy multiple contracts from directory.
+Deploy multiple contracts.
 
 ```python
+import os
+contracts_dir = os.path.abspath("./contracts")
 tx_hash = client.deploy_contracts(
     dapp_name="MyDapp",
     delegator=account,
-    dir_path="./contracts",
-    construct_args=[
-        {"_owner": account.address},
-        None,
-        {"_admin": account.address}
-    ],
+    contracts={
+        os.path.join(contracts_dir, "bank.gcl"): {"_owner": account.address},
+        os.path.join(contracts_dir, "controller.gcl"): None,
+        os.path.join(contracts_dir, "ens.gcl"): {"_owner": account.address}
+    },
     compile_time=30
 )
 ```
@@ -319,14 +320,12 @@ tx_hash = client.deploy_contracts(
 **Parameters**:
 - `dapp_name` (str): DApp name
 - `delegator` (DioxAccount): Account deploying contracts
-- `dir_path` (str): Directory containing contracts
-- `suffix` (str): File suffix filter
-- `construct_args` (list[dict]): Constructor args for each contract
+- `contracts` (dict[str, dict]): Mapping from contract absolute file path to constructor args. Key is the absolute path of the contract file, value is the constructor arguments dict or None
 - `compile_time` (int, optional): Compilation timeout
 
 **Returns**: `str` - deployment transaction hash
 
-**Note**: Contracts are automatically sorted by dependency order.
+**Note**: Contracts are automatically sorted by dependency order on the chain. The `contracts` dictionary maps contract file absolute paths to their constructor arguments.
 
 #### get_contract_state(dapp_name, contract_name, scope, key)
 

@@ -5,6 +5,7 @@ from dioxide_python_sdk.utils.gadget import title_info
 from dioxide_python_sdk.config.client_config import Config
 import sys
 import time
+import os
 
 client = DioxClient()
 
@@ -52,14 +53,18 @@ else:
     sys.exit(1)
 
 title_info("deploy contracts")
-constructors = [{"_owner":account.address}, None, {"_owner":account.address}]
+contracts_dir = os.path.abspath("./test_contracts")
+contracts = {
+    os.path.join(contracts_dir, "bank.gcl"): {"_owner": account.address},
+    os.path.join(contracts_dir, "controller.gcl"): None,
+    os.path.join(contracts_dir, "ens.gcl"): {"_owner": account.address}
+}
 
 try:
     deploy_tx_hash = client.deploy_contracts(
         dapp_name=dapp_name,
         delegator=account,
-        dir_path="./test_contracts",
-        construct_args=constructors,
+        contracts=contracts,
         compile_time=20
     )
     if deploy_tx_hash:
