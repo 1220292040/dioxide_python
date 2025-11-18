@@ -477,9 +477,7 @@ class DioxClient:
     @params:
         dapp_name: dapp名称
         delegator: dapp的所有者,签名账户
-        dir_path: 合约文件夹路径
-        suffix: 合约文件后缀,默认部署该文件夹下所有.gcl
-        construct_args: 合约构造函数,list[object]
+        contracts: 合约文件绝对路径和构造参数的映射字典, dict[绝对路径, 构造参数]
         compile_time: 合约最长的编译时间,一般不设置
     @response -- str
         合约部署交易哈希
@@ -532,32 +530,24 @@ class DioxClient:
         return sorted_contracts
 
     @exception_handler
-    def deploy_contracts(self,dapp_name,delegator:DioxAccount,dir_path=None,suffix=".gcl",construct_args:list[dict]=None,compile_time=None):
+    def deploy_contracts(self,dapp_name,delegator:DioxAccount,contracts:dict[str,dict]=None,compile_time=None):
         deploy_args={}
         codes = []
         cargs = []
-        # Collect all matching files
-        contract_files = []
-        for filepath,_,filenames in os.walk(dir_path):
-            for filename in filenames:
-                if os.path.splitext(filename)[-1] == suffix:
-                    contract_files.append((filepath, filename))
 
-        # Parse dependencies and sort by dependency order
-        dependencies = self._parse_contract_dependencies(contract_files)
-        sorted_contract_names = self._topological_sort(dependencies)
+        if contracts is None or len(contracts) == 0:
+            raise DioxError(-10004, "contracts parameter is required and cannot be empty")
 
-        # Create a mapping from filename to full path
-        file_map = {os.path.splitext(filename)[0]: (filepath, filename)
-                    for filepath, filename in contract_files}
+        # Process contracts in dictionary order (Python 3.7+ maintains insertion order)
+        # This ensures codes and cargs maintain the same correspondence
+        for contract_path in contracts.keys():
+            # Normalize path to handle different path formats
+            normalized_path = os.path.normpath(contract_path)
+            with open(normalized_path) as f:
+                codes.append(f.read())
 
-        # Read files in dependency order
-        for contract_name in sorted_contract_names:
-            if contract_name in file_map:
-                filepath, filename = file_map[contract_name]
-                with open(os.path.join(filepath, filename)) as f:
-                    codes.append(f.read())
-        for carg in construct_args:
+            # Get constructor args for this contract
+            carg = contracts[contract_path]
             if carg is None:
                 cargs.append("")
             else:
