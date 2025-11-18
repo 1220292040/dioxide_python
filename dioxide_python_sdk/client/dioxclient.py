@@ -433,6 +433,22 @@ class DioxClient:
 
     """
     @description:
+        查询已经部署的合约对应的代码
+    @params:
+        dapp_name: dapp名称
+        contract_name: 合约名称
+    @response -- str
+        返回合约的源代码字符串
+    """
+    @exception_handler
+    def get_source_code(self,dapp_name,contract_name):
+        method = "dx.source_code"
+        params = {"contract":"{}.{}".format(dapp_name,contract_name)}
+        response = self.make_request(method,params)
+        return response
+
+    """
+    @description:
         部署合约
     @params:
         dapp_name: dapp名称
