@@ -29,6 +29,17 @@ install-poetry:
 	@poetry --version
 
 install: install-poetry
+	@echo "Checking for Python 3.11..."
+	@if command -v python3.11 > /dev/null 2>&1; then \
+		echo "Using Python 3.11 for Poetry environment..."; \
+		poetry env use python3.11 || poetry env use $(which python3.11); \
+	elif command -v python3.12 > /dev/null 2>&1; then \
+		echo "Using Python 3.12 for Poetry environment..."; \
+		poetry env use python3.12 || poetry env use $(which python3.12); \
+	else \
+		echo "Warning: Python 3.11 or 3.12 not found, using default python3"; \
+		echo "Note: ed25519==1.5 may not work with Python 3.13"; \
+	fi
 	@echo "Installing dependencies..."
 	@poetry install
 	@echo "Dependencies installed successfully!"

@@ -385,6 +385,124 @@ class DioxClient:
 
     """
     @description:
+        本地构建交易,不依赖RPC调用,按照解析交易的相反逻辑实现
+    @params:
+        sender: 发送者地址或DioxAccount对象
+        function: 调用的合约函数(<dapp>.<contract>.<function>)
+        args: 函数调用参数,dict格式,key为参数名
+        signature: 函数签名,格式如"address:to,uint32:amount",如果不提供则从合约信息中获取
+        contract_info: 合约信息对象(可选),如果不提供则通过RPC获取
+        isn: 交易isn,不填默认为最新isn
+        is_delegatee: 是否是委托交易
+        gas_price: 设置交易gas_price
+        gas_limit: 设置交易gas_limit
+        ttl: 交易生存时间
+    @response -- bytes
+        未签名的交易字节流
+    """
+    @exception_handler
+    def compose_transaction_local(self, sender, function: str, args: dict, signature: str = None,
+                                  contract_info=None, isn=None, is_delegatee=False,
+                                  gas_price=None, gas_limit=None, ttl=None):
+        from ..utils.gadget import serialize_args
+        from .transaction import UnsignedTransaction
+        from .contract import ContractInvokeID, ContractID, ContractVersionID
+        from .account import DioxAddress, DioxAddressType
+
+        parts = function.split(".")
+        if len(parts) != 3:
+            raise DioxError(-10003, f"Invalid function format: {function}, expected 'dapp.contract.function'")
+
+        dapp_name, contract_name, function_name = parts
+
+        if contract_info is None:
+            contract_info = self.get_contract_info(dapp_name, contract_name)
+
+        contract_id_val = contract_info.ContractID
+        contract_version_id_val = contract_info.ContractVersionID
+
+        contract_id = ContractID(contract_id_val)
+        contract_version_id = ContractVersionID(contract_version_id_val)
+
+        function_info = None
+        functions = contract_info.Functions if hasattr(contract_info, 'Functions') else []
+        for func in functions:
+            func_name = func.get("Name") if isinstance(func, dict) else getattr(func, "Name", None)
+            if func_name == function_name:
+                function_info = func
+                break
+
+        if function_info is None:
+            raise DioxError(-10004, f"Function {function_name} not found in contract {dapp_name}.{contract_name}")
+
+        if signature is None:
+            params = function_info.get("Params", []) if isinstance(function_info, dict) else getattr(function_info, "Params", [])
+            if not params:
+                signature = ""
+            else:
+                sig_parts = []
+                for param in params:
+                    if isinstance(param, dict):
+                        param_type = param.get("Type", "")
+                        param_name = param.get("Name", "")
+                    else:
+                        param_type = getattr(param, "Type", "")
+                        param_name = getattr(param, "Name", "")
+                    sig_parts.append(f"{param_type}:{param_name}")
+                signature = ",".join(sig_parts)
+
+        opcode = function_info.get("Opcode", 0) if isinstance(function_info, dict) else getattr(function_info, "Opcode", 0)
+
+        dapp_id = contract_id.dapp_id
+        engine_id = contract_id.engine_id
+        sn = contract_id.sn
+        build = contract_version_id.build
+
+        scope_value = (contract_id.get_scope() >> 8) & 0xFFF
+
+        contract_invoke_id = ContractInvokeID(
+            sn=sn,
+            engine_id=engine_id,
+            dapp_id=dapp_id,
+            scope=scope_value,
+            build=build
+        )
+
+        delegatee = None
+        if is_delegatee:
+            if isinstance(sender, str):
+                delegatee = DioxAddress(None, DioxAddressType.DAPP)
+                if not delegatee.set_delegatee_from_string(sender):
+                    raise DioxError(-10005, f"Invalid delegatee: {sender}")
+            else:
+                delegatee = DioxAddress(sender.address_bytes, DioxAddressType.DEFAULT)
+
+        tx = UnsignedTransaction(contract_invoke_id, opcode, delegatee=delegatee)
+
+        if isn is not None:
+            tx.set_isn(isn)
+        else:
+            sender_addr = sender.address if hasattr(sender, 'address') else sender
+            tx.set_isn(self.get_isn(sender_addr))
+
+        if gas_price is not None:
+            tx.set_gas_price(gas_price)
+        if gas_limit is not None:
+            tx.set_gas_limit(gas_limit)
+        if ttl is not None:
+            tx.ttl = ttl
+
+        if args and signature:
+            serialized_input = serialize_args(signature, args)
+            tx.input = bytes.fromhex(serialized_input)
+            tx.input_size = len(tx.input)
+        elif not args:
+            tx.mode |= 0x400
+
+        return tx.serialize()
+
+    """
+    @description:
         发送签名后的交易
     @params:
         signed_txn: 签名后的交易字节流

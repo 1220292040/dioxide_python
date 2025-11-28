@@ -259,3 +259,65 @@ def deserialized_args(signature: str, sargs: str, offset: bool = False):
     if offset:
         return ret, current_offset
     return ret
+
+
+def serialize_args(signature: str, args: dict) -> str:
+    """
+    Serialize arguments according to signature type order using the GCL serializer.
+    This is the reverse operation of deserialized_args.
+    
+    Args:
+        signature: Type signature string like "address:to,uint32:a,uint32:b"
+        args: Dictionary with argument values, keys should match parameter names in signature
+    
+    Returns:
+        Hex string of serialized data
+    
+    Example:
+        signature = "address:to,uint32:amount"
+        args = {"to": "abc123...", "amount": 100}
+        result = serialize_args(signature, args)
+    """
+    from .serializer import serialize
+
+    params = []
+    current_param = ""
+    depth = 0
+
+    for char in signature:
+        if char == '<':
+            depth += 1
+        elif char == '>':
+            depth -= 1
+        elif char == ',' and depth == 0:
+            params.append(current_param.strip())
+            current_param = ""
+            continue
+        current_param += char
+
+    if current_param.strip():
+        params.append(current_param.strip())
+
+    result = bytearray()
+
+    for idx, param in enumerate(params):
+        colon_pos = param.rfind(":")
+        if colon_pos != -1:
+            type_name = param[:colon_pos].strip()
+            name = param[colon_pos+1:].strip()
+        else:
+            type_name = param.strip()
+            name = f"value#{idx}"
+
+        if name not in args:
+            raise ValueError(f"Missing argument: {name}")
+
+        value = args[name]
+
+        try:
+            serialized_bytes = serialize(type_name, value)
+            result.extend(serialized_bytes)
+        except Exception as e:
+            raise ValueError(f"Failed to serialize {name} ({type_name}): {e}")
+
+    return result.hex()
