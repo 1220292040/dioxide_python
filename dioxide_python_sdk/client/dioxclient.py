@@ -963,3 +963,61 @@ class DioxClient:
         else:
             return False
 
+    """
+    @description:
+        Decode transaction input data
+    @params:
+        tx: Transaction object from get_transaction
+    @response -- dict
+        Decoded arguments dictionary
+    """
+    @exception_handler
+    def decode_transaction_input(self, tx):
+        from ..utils.gadget import deserialized_args
+        
+        if not hasattr(tx, 'Function') or not hasattr(tx, 'Input'):
+            raise DioxError(-10006, "Transaction object must have Function and Input fields")
+        
+        function = tx.Function
+        input_hex = tx.Input
+        
+        if not input_hex or input_hex == "":
+            return {}
+        
+        parts = function.split(".")
+        if len(parts) != 3:
+            raise DioxError(-10003, f"Invalid function format: {function}, expected 'dapp.contract.function'")
+        
+        dapp_name, contract_name, function_name = parts
+        
+        contract_info = self.get_contract_info(dapp_name, contract_name)
+        functions = contract_info.Functions if hasattr(contract_info, 'Functions') else []
+        
+        function_info = None
+        for func in functions:
+            func_name = func.get("Name") if isinstance(func, dict) else getattr(func, "Name", None)
+            if func_name == function_name:
+                function_info = func
+                break
+        
+        if function_info is None:
+            raise DioxError(-10004, f"Function {function_name} not found in contract {dapp_name}.{contract_name}")
+        
+        params = function_info.get("Params", []) if isinstance(function_info, dict) else getattr(function_info, "Params", [])
+        if not params:
+            return {}
+        
+        sig_parts = []
+        for param in params:
+            if isinstance(param, dict):
+                param_type = param.get("Type", "")
+                param_name = param.get("Name", "")
+            else:
+                param_type = getattr(param, "Type", "")
+                param_name = getattr(param, "Name", "")
+            sig_parts.append(f"{param_type}:{param_name}")
+        
+        signature = ",".join(sig_parts)
+        
+        return deserialized_args(signature, input_hex)
+
