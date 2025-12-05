@@ -97,8 +97,6 @@ if not tx2:
     print("✗ set_authority failed")
     sys.exit(1)
 
-time.sleep(3)
-
 title_info("test deposit")
 tx3 = client.send_transaction(account, f"{dapp_name}.{ens_contract_name}.invoke", {"operation": "deposit", "amount": 1000}, is_sync=True)
 if not tx3:
