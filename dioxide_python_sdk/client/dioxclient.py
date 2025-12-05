@@ -974,23 +974,48 @@ class DioxClient:
     @exception_handler
     def decode_transaction_input(self, tx):
         from ..utils.gadget import deserialized_args
-        
+
         if not hasattr(tx, 'Function') or not hasattr(tx, 'Input'):
             raise DioxError(-10006, "Transaction object must have Function and Input fields")
-        
+
         function = tx.Function
-        input_hex = tx.Input
+        input_data = tx.Input
         
-        if not input_hex or input_hex == "":
+        # If input is already a dictionary (decoded), return it directly
+        if isinstance(input_data, dict):
+            return input_data
+        
+        # If input is empty, return empty dict
+        if not input_data or input_data == "":
             return {}
         
+        # Check if this is a core contract function (format: core.module.scope.function)
         parts = function.split(".")
+        if len(parts) >= 2 and parts[0] == "core":
+            # For core contracts, if input is already decoded (dict), return it
+            # Otherwise, we cannot decode core contract inputs without their ABI
+            # Return empty dict or the input as-is if it's a string
+            if isinstance(input_data, str):
+                # Try to parse as hex string and decode if possible
+                # For now, return empty dict for core contracts with hex input
+                # as we don't have access to core contract ABIs
+                return {}
+            return input_data
+        
+        # For regular contracts, expect format: dapp.contract.function
         if len(parts) != 3:
             raise DioxError(-10003, f"Invalid function format: {function}, expected 'dapp.contract.function'")
         
         dapp_name, contract_name, function_name = parts
         
-        contract_info = self.get_contract_info(dapp_name, contract_name)
+        # Get contract info to find function signature
+        try:
+            contract_info = self.get_contract_info(dapp_name, contract_name)
+        except Exception as e:
+            # If contract info cannot be retrieved, return empty dict
+            self.logger.warning(f"Cannot get contract info for {dapp_name}.{contract_name}: {e}")
+            return {}
+        
         functions = contract_info.Functions if hasattr(contract_info, 'Functions') else []
         
         function_info = None
@@ -1019,5 +1044,9 @@ class DioxClient:
         
         signature = ",".join(sig_parts)
         
-        return deserialized_args(signature, input_hex)
+        # input_data should be a hex string at this point
+        if not isinstance(input_data, str):
+            return {}
+        
+        return deserialized_args(signature, input_data)
 
