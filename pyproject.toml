@@ -6,7 +6,7 @@ authors = [
     {name = "phenix3443",email = "phenix3443@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 dependencies = [
     "crc32c==2.7.post1",
     "ed25519==1.5",
