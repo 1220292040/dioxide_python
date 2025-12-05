@@ -97,13 +97,32 @@ if not tx2:
     print("✗ set_authority failed")
     sys.exit(1)
 
-time.sleep(3)
-
 title_info("test deposit")
 tx3 = client.send_transaction(account, f"{dapp_name}.{ens_contract_name}.invoke", {"operation": "deposit", "amount": 1000}, is_sync=True)
 if not tx3:
     print("✗ deposit failed")
     sys.exit(1)
+
+print(f"Deposit transaction hash: {tx3}")
+
+title_info("decode transaction input")
+tx3_obj = client.get_transaction(tx3)
+print(f"Transaction Function: {tx3_obj.Function}")
+print(f"Transaction Input (hex): {tx3_obj.Input}")
+decoded_args = client.decode_transaction_input(tx3_obj)
+print(f"Decoded arguments: {decoded_args}")
+
+if hasattr(tx3_obj, 'Invocation') and hasattr(tx3_obj.Invocation, 'Relays') and tx3_obj.Invocation.Relays:
+    print(f"\nFound {len(tx3_obj.Invocation.Relays)} relay transaction(s)")
+    for i, relay_hash in enumerate(tx3_obj.Invocation.Relays):
+        relay_tx = client.get_transaction(relay_hash)
+        print(f"Relay {i+1} - Function: {relay_tx.Function}")
+        print(f"Relay {i+1} - Input (hex): {relay_tx.Input}")
+        try:
+            decoded_relay = client.decode_transaction_input(relay_tx)
+            print(f"Relay {i+1} - Decoded: {decoded_relay}")
+        except Exception as e:
+            print(f"Relay {i+1} - Could not decode (may be core contract): {e}")
 
 time.sleep(5)
 state = client.get_contract_state(dapp_name, bank_contract_name, Scope.Address, account.address)
