@@ -17,6 +17,7 @@ def exception_handler(func):
             return result
         except Exception as e:
             print(f"exception: {e}")
+            raise
     return wrapper
 
 # pow
