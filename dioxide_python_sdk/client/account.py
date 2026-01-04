@@ -96,7 +96,7 @@ class DioxAddress:
             return DioxAddress(addr)
         else:
             return None
-    
+
     @property
     def address_bytes(self):
         return bytes(self.__address)
@@ -115,7 +115,7 @@ class DioxAddress:
                 valid += 1
             addr = self.__address[0:valid]
             return bytes(addr).decode() + ":" + self.__type.name.lower()
-    
+
     @address.setter
     def address(self,address):
         self.__address = address
@@ -123,7 +123,7 @@ class DioxAddress:
     @property
     def type(self):
         return self.__type
-    
+
     @address.setter
     def type(self,type):
         self.__type = type
@@ -162,7 +162,7 @@ class DioxAccount:
                 return None
         except:
             return None
-        
+
     #TODO support other type of key
     @staticmethod
     def from_json(json,type=DioxAccountType.ED25519):
@@ -170,7 +170,22 @@ class DioxAccount:
             sk = None
             pk = None
             addr = None
-            if type == DioxAccountType.ED25519:
+            account_type = type
+
+            if "AddressType" in json and json["AddressType"] is not None:
+                try:
+                    account_type = DioxAccountType[json["AddressType"].upper()]
+                except:
+                    pass
+
+            if "Address" in json and json["Address"] is not None:
+                addr_str = str(json["Address"])
+                if ":sm2" in addr_str.lower():
+                    account_type = DioxAccountType.SM2
+                elif ":ed25519" in addr_str.lower():
+                    account_type = DioxAccountType.ED25519
+
+            if account_type == DioxAccountType.ED25519:
                 if json["PrivateKey"] is not None:
                     sk = base64.b64decode(json["PrivateKey"])
                 if json["PublicKey"] is not None:
@@ -181,8 +196,19 @@ class DioxAccount:
                     addr = decoder.finalize()
                 account = DioxAccount(sk,pk,addr,DioxAccountType.ED25519)
                 return account if account.is_valid() else None
+            elif account_type == DioxAccountType.SM2:
+                if json["PrivateKey"] is not None:
+                    sk = base64.b64decode(json["PrivateKey"])
+                if json["PublicKey"] is not None:
+                    pk = base64.b64decode(json["PublicKey"])
+                if json["Address"] is not None:
+                    decoder = krock32.Decoder()
+                    decoder.update(str(json["Address"]).split(":")[0])
+                    addr = decoder.finalize()
+                account = DioxAccount(sk,pk,addr,DioxAccountType.SM2)
+                return account if account.is_valid() else None
             else:
-                None
+                return None
         except:
             return None
 
@@ -203,7 +229,7 @@ class DioxAccount:
     @property
     def sk_b64(self):
         return base64.b64encode(self.sk_bytes).decode("utf-8")
-    
+
     @property
     def pk_b64(self):
         return base64.b64encode(self.pk_bytes).decode("utf-8")
@@ -211,7 +237,7 @@ class DioxAccount:
     @property
     def sk_bytes(self):
         return self.__private_key
-    
+
     @sk_bytes.setter
     def sk_bytes(self,sk):
         self.__private_key = sk
@@ -231,7 +257,7 @@ class DioxAccount:
     @property
     def address(self):
         return DioxAddress(self.__address).address
-    
+
     @address.setter
     def address(self,address):
         self.__address = address
@@ -245,10 +271,18 @@ class DioxAccount:
         self.__account_type = type
 
     def is_valid(self):
-        return len(self.sk_bytes) == 64 and \
-               len(self.pk_bytes) == 32 and \
-               len(self.address_bytes) == 36 and \
-               self.account_type.value < DioxAccountType.END.value
+        if self.account_type.value >= DioxAccountType.END.value:
+            return False
+        if self.sk_bytes is None or self.pk_bytes is None or self.address_bytes is None:
+            return False
+        if len(self.address_bytes) != 36:
+            return False
+        if self.account_type == DioxAccountType.ED25519:
+            return len(self.sk_bytes) == 64 and len(self.pk_bytes) == 32
+        elif self.account_type == DioxAccountType.SM2:
+            return len(self.sk_bytes) == 32 and len(self.pk_bytes) == 64
+        else:
+            return len(self.sk_bytes) > 0 and len(self.pk_bytes) > 0
 
     def jsonify(self):
         ret = {}
