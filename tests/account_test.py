@@ -65,3 +65,17 @@ key = "cqt3xyv2zb4fzwbdy8wn94akxavxk1srdvb69x8a42xsn34k1fes700f60:ed25519".encod
 addr = DioxAddress.from_key(key.decode())
 print(addr,account2.address)
 print(addr == account2.address)
+
+test_sm2_json = {
+    "PrivateKey": "+OfM+tj9R8I/BnIjCvc+JAdl0ADy1vAkbu0n2KINwzw=",
+    "PublicKey": "AX1hRvLswVwarsbSDiQHzxmSGwR95G4DPfjnLP2oAtDr3kNsJ7X7Q5l5yhnWg/5hTe30O/CZRIbOvv94y3cmvQ==",
+    "Address": "zqgx8f30g04qpd2fxxm9e05een3ytjp970vzbjnhctjrf7kj5per84cj34:sm2"
+}
+account_sm2 = DioxAccount.from_json(test_sm2_json)
+print("SM2 Account:", account_sm2)
+if account_sm2:
+    print("SM2 Account Type:", account_sm2.account_type)
+    print("SM2 Address:", account_sm2.address)
+    print("SM2 Private Key Length:", len(account_sm2.sk_bytes))
+    print("SM2 Public Key Length:", len(account_sm2.pk_bytes))
+    print("SM2 Is Valid:", account_sm2.is_valid())
