@@ -801,7 +801,10 @@ class DioxClient:
     #wrapper method ----------------------------------------------------------------
     @exception_handler
     def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,gas_price=None,gas_limit=None,is_sync=False,timeout=DEFAULT_TIMEOUT):
-        unsigned_txn = self.compose_transaction(sender=user.address,
+        sender_addr = user.address
+        if ":" not in sender_addr:
+            sender_addr = sender_addr + ":" + user.account_type.name.lower()
+        unsigned_txn = self.compose_transaction(sender=sender_addr,
                                           function=function,
                                           args=args,
                                           tokens=tokens,
