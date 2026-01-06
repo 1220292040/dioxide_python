@@ -20,6 +20,7 @@ class DioxAddressType(Enum):
     NAME = 9
     DAPP = 10
     TOKEN = 11
+	CONTRACT = 14
 
 
 class SecSuiteParam(Enum):
