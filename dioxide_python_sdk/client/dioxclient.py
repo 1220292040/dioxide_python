@@ -735,7 +735,6 @@ class DioxClient:
         ret = []
         relays = self.get_all_relay_transactions(tx,detail=True)
         for relay in relays:
-            print(relay)
             if relay.get("Mode","").find("TMF_EXTERNAL") != -1:
                 ret.append(relay)
         return ret
