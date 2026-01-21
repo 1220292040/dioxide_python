@@ -2,9 +2,6 @@
 name = "dioxide-python-sdk"
 version = "0.2.0"
 description = "dioxide python SDK"
-authors = [
-    {name = "phenix3443",email = "phenix3443@gmail.com"}
-]
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
@@ -17,11 +14,10 @@ dependencies = [
     "websockets==11.0.3",
 ]
 
-
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[tool.poetry.group.dev.dependencies]
-pytest = "<8.0.0"
-
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dioxide_python_sdk*"]
