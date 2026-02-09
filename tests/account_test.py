@@ -79,3 +79,9 @@ if account_sm2:
     print("SM2 Private Key Length:", len(account_sm2.sk_bytes))
     print("SM2 Public Key Length:", len(account_sm2.pk_bytes))
     print("SM2 Is Valid:", account_sm2.is_valid())
+
+sm2_key = "zqgx8f30g04qpd2fxxm9e05een3ytjp970vzbjnhctjrf7kj5per84cj34:sm2"
+sm2_addr = DioxAddress.from_key(sm2_key)
+print("SM2 Address from_key:", sm2_addr)
+if account_sm2:
+    print("SM2 Address comparison:", sm2_addr == account_sm2.address if sm2_addr else False)
