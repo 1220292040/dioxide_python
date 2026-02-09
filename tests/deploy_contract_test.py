@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, ".")
 
-from dioxide_python_sdk.client.dioxclient import DioxClient
+from dioxide_python_sdk.client.dioxclient import DioxClient, DioxError
 from dioxide_python_sdk.client.account import DioxAccount
 
 
@@ -59,6 +59,15 @@ class TestDeployContractNoArgs(unittest.TestCase):
         args = call_kwargs["args"]
         self.assertEqual(args["cargs"], ['{"_owner": "addr123"}'])
 
+    def test_deploy_contract_no_file_path_empty_source_code_raises(self):
+        with self.assertRaises(DioxError) as ctx:
+            self.client.deploy_contract(
+                self.dapp_name,
+                self.delegator,
+                file_path=None,
+                source_code="",
+            )
+        self.assertEqual(ctx.exception.code, -10001)
 
 if __name__ == "__main__":
     unittest.main()
