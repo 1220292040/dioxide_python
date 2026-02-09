@@ -585,10 +585,9 @@ class DioxClient:
             with open(file_path) as f:
                 deploy_args.update({"code":[f.read()]})
         else:
-            if source_code is None:
+            if source_code is None or (isinstance(source_code, str) and source_code.strip() == ""):
                 raise DioxError(-10001, "params error")
-            else:
-                deploy_args.update({"code":[source_code]})
+            deploy_args.update({"code":[source_code]})
         if construct_args is None:
             deploy_args.update({"cargs": [""]})
         else:
