@@ -339,11 +339,19 @@ class DioxClient:
     def get_transaction(self,hash:str,shard_index=None):
         method = "dx.transaction"
         params = {}
-        params.update({"hash":hash})
-        if shard_index is not None:
-            params.update({"shard_index":shard_index})
-        response = self.make_request(method,params)
-        return Box(response,default_box=True)
+        tx_hash = hash
+        tx_shard = shard_index
+        if ":" in hash:
+            base, suffix = hash.split(":", 1)
+            if suffix.isdigit():
+                tx_hash = base
+                if tx_shard is None:
+                    tx_shard = int(suffix)
+        params.update({"hash": tx_hash})
+        if tx_shard is not None:
+            params.update({"shard_index": tx_shard})
+        response = self.make_request(method, params)
+        return Box(response, default_box=True)
 
     """
     @description:
