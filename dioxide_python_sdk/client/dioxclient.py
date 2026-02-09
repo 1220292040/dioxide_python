@@ -589,7 +589,10 @@ class DioxClient:
                 raise DioxError(-10001, "params error")
             else:
                 deploy_args.update({"code":[source_code]})
-        deploy_args.update({"cargs":[json.dumps(construct_args)]})
+        if construct_args is None:
+            deploy_args.update({"cargs": [""]})
+        else:
+            deploy_args.update({"cargs": [json.dumps(construct_args)]})
         if compile_time is not None:
             deploy_args.update({"time":compile_time})
         dapp_address = DioxAddress(None,DioxAddressType.DAPP)
