@@ -801,7 +801,10 @@ class DioxClient:
     #wrapper method ----------------------------------------------------------------
     @exception_handler
     def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,gas_price=None,gas_limit=None,is_sync=False,timeout=DEFAULT_TIMEOUT):
-        unsigned_txn = self.compose_transaction(sender=user.address,
+        sender_addr = user.address
+        if ":" not in sender_addr:
+            sender_addr = sender_addr + ":" + user.account_type.name.lower()
+        unsigned_txn = self.compose_transaction(sender=sender_addr,
                                           function=function,
                                           args=args,
                                           tokens=tokens,
@@ -944,24 +947,28 @@ class DioxClient:
         return True
 
     def wait_for_dapp_deployed(self,tx_hash,timeout):
-        if self.wait_for_transaction_confirmed(tx_hash,timeout):
-            relays = self.get_all_relay_transactions(self.get_transaction(tx_hash),detail=True)
-            for relay in relays:
-                if relay.Function == 'core.coin.address.deposit':
-                    return False
-            return True
-        else:
+        if not self.wait_for_transaction_confirmed(tx_hash,timeout):
             return False
+        tx = self.get_transaction(tx_hash)
+        if not self.is_tx_success_with_relays(tx):
+            return False
+        relays = self.get_all_relay_transactions(tx,detail=True)
+        for relay in relays:
+            if relay.Function == 'core.coin.address.deposit':
+                return False
+        return True
 
     def wait_for_token_deployed(self,tx_hash,timeout):
-        if self.wait_for_transaction_confirmed(tx_hash,timeout):
-            relays = self.get_all_relay_transactions(self.get_transaction(tx_hash),detail=True)
-            for relay in relays:
-                if relay.Function == 'core.coin.address.deposit':
-                    return False
-            return True
-        else:
+        if not self.wait_for_transaction_confirmed(tx_hash,timeout):
             return False
+        tx = self.get_transaction(tx_hash)
+        if not self.is_tx_success_with_relays(tx):
+            return False
+        relays = self.get_all_relay_transactions(tx,detail=True)
+        for relay in relays:
+            if relay.Function == 'core.coin.address.deposit':
+                return False
+        return True
 
     """
     @description:
@@ -980,15 +987,15 @@ class DioxClient:
 
         function = tx.Function
         input_data = tx.Input
-        
+
         # If input is already a dictionary (decoded), return it directly
         if isinstance(input_data, dict):
             return input_data
-        
+
         # If input is empty, return empty dict
         if not input_data or input_data == "":
             return {}
-        
+
         # Check if this is a core contract function (format: core.module.scope.function)
         parts = function.split(".")
         if len(parts) >= 2 and parts[0] == "core":
@@ -1001,13 +1008,13 @@ class DioxClient:
                 # as we don't have access to core contract ABIs
                 return {}
             return input_data
-        
+
         # For regular contracts, expect format: dapp.contract.function
         if len(parts) != 3:
             raise DioxError(-10003, f"Invalid function format: {function}, expected 'dapp.contract.function'")
-        
+
         dapp_name, contract_name, function_name = parts
-        
+
         # Get contract info to find function signature
         try:
             contract_info = self.get_contract_info(dapp_name, contract_name)
@@ -1015,23 +1022,23 @@ class DioxClient:
             # If contract info cannot be retrieved, return empty dict
             self.logger.warning(f"Cannot get contract info for {dapp_name}.{contract_name}: {e}")
             return {}
-        
+
         functions = contract_info.Functions if hasattr(contract_info, 'Functions') else []
-        
+
         function_info = None
         for func in functions:
             func_name = func.get("Name") if isinstance(func, dict) else getattr(func, "Name", None)
             if func_name == function_name:
                 function_info = func
                 break
-        
+
         if function_info is None:
             raise DioxError(-10004, f"Function {function_name} not found in contract {dapp_name}.{contract_name}")
-        
+
         params = function_info.get("Params", []) if isinstance(function_info, dict) else getattr(function_info, "Params", [])
         if not params:
             return {}
-        
+
         sig_parts = []
         for param in params:
             if isinstance(param, dict):
@@ -1041,12 +1048,12 @@ class DioxClient:
                 param_type = getattr(param, "Type", "")
                 param_name = getattr(param, "Name", "")
             sig_parts.append(f"{param_type}:{param_name}")
-        
+
         signature = ",".join(sig_parts)
-        
+
         # input_data should be a hex string at this point
         if not isinstance(input_data, str):
             return {}
-        
+
         return deserialized_args(signature, input_data)
 
