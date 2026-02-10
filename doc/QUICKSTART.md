@@ -58,7 +58,9 @@ Expected output:
 ```python
 from dioxide_python_sdk.client.dioxclient import DioxClient
 
-# Create client instance
+# Create client instance (default: http://127.0.0.1:62222/api)
+# To use another node, pass url and optionally ws_url:
+# client = DioxClient(url="http://your-host:port/api", ws_url="ws://your-host:port/api")
 client = DioxClient()
 
 # Check connection
