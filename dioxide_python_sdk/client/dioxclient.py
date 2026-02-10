@@ -995,8 +995,20 @@ class DioxClient:
         if not hasattr(tx, 'Function') or not hasattr(tx, 'Input'):
             raise DioxError(-10006, "Transaction object must have Function and Input fields")
 
-        function = tx.Function
-        input_data = tx.Input
+        raw = dict(tx) if isinstance(tx, Box) else (tx if isinstance(tx, dict) else None)
+        if raw is not None:
+            function = raw.get("Function", "") or ""
+            input_data = raw.get("Input")
+        else:
+            function = tx.Function
+            input_data = tx.Input
+        if isinstance(function, Box):
+            function = str(function) if not isinstance(function, str) else function
+        if isinstance(input_data, Box):
+            input_data = dict(input_data) if input_data else None
+
+        if not function or (isinstance(function, str) and function.strip() == ""):
+            return {}
 
         # If input is already a dictionary (decoded), return it directly
         if isinstance(input_data, dict):
