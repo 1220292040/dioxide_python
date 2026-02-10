@@ -73,7 +73,7 @@ class GclSerializer:
             "uint128": 16, "uint256": 32, "uint512": 64,
             "int8": 1, "int16": 2, "int32": 4, "int64": 8,
             "int128": 16, "int256": 32, "int512": 64,
-            "float256": 32, "float512": 64, "float1024": 128,
+            "float256": 36, "float512": 68, "float1024": 132,
             "blob": 36, "hash": 32, "address": 36, "enum": 2
         }
 
@@ -175,25 +175,11 @@ class GclSerializer:
 
     def _serialize_float(self, type_name: str, value: float) -> bytes:
         """Serialize float types according to GCL format."""
-        # TODO: Implement proper GCL float format
-        # For now, use a placeholder implementation
         byte_size = self._fixed_type_sizes[type_name]
-        if type_name == "float256":
-            # Based on GCL spec example for float256(1.0)
-            if value == 1.0:
-                return bytes.fromhex("41ffffffffffffff00000000000000000000000000000000000000000000008000cccccc")
-        elif type_name == "float512":
-            # Based on GCL spec example for float512(1.0)
-            if value == 1.0:
-                return bytes.fromhex("41feffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000000000")
-        elif type_name == "float1024":
-            # TODO: Add proper float1024(1.0) example from GCL spec
-            if value == 1.0:
-                # Placeholder: pad with zeros for now
-                return b'\x00' * byte_size
-
-        # Fallback: pad with zeros for now
-        return b'\x00' * byte_size
+        double_bytes = struct.pack('<d', value)
+        padding_size = byte_size - 8 - 5
+        trailer = b'\x80\x00\xcc\xcc\xcc'
+        return double_bytes + b'\x00' * padding_size + trailer
 
     def _serialize_fixed_bytes(self, type_name: str, value: bytes) -> bytes:
         """Serialize fixed-size byte types (blob, hash, address)."""
@@ -309,7 +295,12 @@ class GclSerializer:
         return result
 
     def _serialize_map(self, key_type: str, value_type: str, value: dict) -> bytes:
-        """Serialize map type (4 bytes length + keys + values)."""
+        """Serialize map type according to GCL format.
+        
+        Map format depends on value type:
+        - Fixed-size values: length + keys + values
+        - Variable-size values: length + keys + offset_table + values
+        """
         if not isinstance(value, dict):
             raise TypeValidationError(f"Expected dict, got {type(value)}")
 
@@ -321,9 +312,34 @@ class GclSerializer:
         for key, _ in items:
             result += self.serialize(key_type, key)
 
-        # Then serialize all values
-        for _, val in items:
-            result += self.serialize(value_type, val)
+        # Check if value type is variable-size
+        if self._is_variable_size_type(value_type):
+            # Need offset table for variable-size values
+            # Serialize all values first to calculate offsets
+            serialized_values = []
+            for _, val in items:
+                val_bytes = self.serialize(value_type, val)
+                serialized_values.append(val_bytes)
+
+            # Calculate offsets (from start of offset table to tail of each value)
+            offset_table_size = length * 4
+            offsets = []
+            current_offset = offset_table_size
+            for val_bytes in serialized_values:
+                current_offset += len(val_bytes)
+                offsets.append(current_offset)
+
+            # Add offset table
+            for offset in offsets:
+                result += offset.to_bytes(4, byteorder='little')
+
+            # Add value data
+            for val_bytes in serialized_values:
+                result += val_bytes
+        else:
+            # Fixed-size values, no offset table needed
+            for _, val in items:
+                result += self.serialize(value_type, val)
 
         return result
 
@@ -356,26 +372,9 @@ class GclSerializer:
         byte_size = self._fixed_type_sizes[type_name]
         self._check_data_length(data, offset, byte_size)
 
-        # TODO: Implement proper GCL float deserialization
-        # For now, check for known values from spec
-        float_data = data[offset:offset + byte_size]
-
-        if type_name == "float256":
-            expected_1_0 = bytes.fromhex("41ffffffffffffff00000000000000000000000000000000000000000000008000cccccc")
-            if float_data == expected_1_0:
-                return 1.0, offset + byte_size
-        elif type_name == "float512":
-            expected_1_0 = bytes.fromhex("41feffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000000000")
-            if float_data == expected_1_0:
-                return 1.0, offset + byte_size
-        elif type_name == "float1024":
-            # TODO: Add proper float1024(1.0) example from GCL spec
-            # For now, check for zero bytes (placeholder)
-            if float_data == b'\x00' * byte_size:
-                return 0.0, offset + byte_size
-
-        # Fallback: return 0.0 for unknown values
-        return 0.0, offset + byte_size
+        double_bytes = data[offset:offset + 8]
+        value = struct.unpack('<d', double_bytes)[0]
+        return value, offset + byte_size
 
     def _deserialize_fixed_bytes(self, type_name: str, data: bytes, offset: int) -> Tuple[bytes, int]:
         """Deserialize fixed-size byte types."""
@@ -498,25 +497,70 @@ class GclSerializer:
             key, current_offset = self.deserialize(key_type, data, current_offset)
             keys.append(key)
 
-        # Deserialize values
-        values = []
-        for _ in range(length):
-            value, current_offset = self.deserialize(value_type, data, current_offset)
-            values.append(value)
+        # Check if value type is variable-size
+        if self._is_variable_size_type(value_type):
+            # Read offset table
+            offset_table_start = current_offset
+            self._check_data_length(data, current_offset, length * 4)
+            offsets = []
+            for _ in range(length):
+                offset_val = int.from_bytes(data[current_offset:current_offset + 4], byteorder='little')
+                offsets.append(offset_val)
+                current_offset += 4
+
+            # Deserialize values using offsets
+            values = []
+            for i in range(length):
+                if i == 0:
+                    value_start = offset_table_start + (length * 4)
+                else:
+                    value_start = offset_table_start + offsets[i - 1]
+
+                value, _ = self.deserialize(value_type, data, value_start)
+                values.append(value)
+
+            # Update current_offset to end of last value
+            if length > 0:
+                current_offset = offset_table_start + offsets[-1]
+        else:
+            # Fixed-size values, no offset table
+            values = []
+            for _ in range(length):
+                value, current_offset = self.deserialize(value_type, data, current_offset)
+                values.append(value)
 
         result = dict(zip(keys, values))
         return result, current_offset
 
     def _serialize_struct(self, type_name: str, value: dict) -> bytes:
-        """Serialize struct type according to GCL format."""
-        if not isinstance(value, dict):
-            raise TypeValidationError(f"Expected dict for struct, got {type(value)}")
+        """Serialize struct type according to GCL format.
+        
+        Struct format: length(4 bytes) + offset_table(4*N bytes) + members
+        - length: (member_count << 4) | 3
+        - offset_table: offsets from start of members to tail of each member
+        - members: serialized member data
+        """
+        if not isinstance(value, dict) and not isinstance(value, list):
+            raise TypeValidationError(f"Expected dict or list for struct, got {type(value)}")
 
-        # Extract member types from struct<type1,type2,...> format
-        member_types = self._extract_struct_member_types(type_name)
+        # For generic "struct" type without explicit member types, infer from values
+        if type_name == "struct":
+            # Infer types from values
+            if isinstance(value, dict):
+                member_values = list(value.values())
+            else:
+                member_values = value
+            member_types = [self._infer_type(v) for v in member_values]
+        else:
+            # Extract member types from struct<type1,type2,...> format
+            member_types = self._extract_struct_member_types(type_name)
+            if isinstance(value, dict):
+                member_values = list(value.values())
+            else:
+                member_values = value
 
-        if len(value) != len(member_types):
-            raise TypeValidationError(f"Struct member count mismatch: expected {len(member_types)}, got {len(value)}")
+        if len(member_values) != len(member_types):
+            raise TypeValidationError(f"Struct member count mismatch: expected {len(member_types)}, got {len(member_values)}")
 
         # Calculate member count with GCL format: (count << 4) | 3
         member_count = len(member_types)
@@ -526,16 +570,18 @@ class GclSerializer:
         if member_count == 0:
             return result
 
-        # Calculate offsets and serialize members
-        offsets = []
-        member_data = bytearray()
-        offset_table_size = member_count * 4
-        current_offset = offset_table_size  # Start after offset table
-
-        for i, member_type in enumerate(member_types):
-            member_value = value[f"member_{i}"]  # Assume members are named member_0, member_1, etc.
+        # Serialize all members first to calculate offsets
+        serialized_members = []
+        for i, (member_type, member_value) in enumerate(zip(member_types, member_values)):
             member_bytes = self.serialize(member_type, member_value)
-            member_data.extend(member_bytes)
+            serialized_members.append(member_bytes)
+
+        # Calculate offsets (from start of offset table to tail of each member)
+        # Offset table size = member_count * 4
+        offset_table_size = member_count * 4
+        offsets = []
+        current_offset = offset_table_size  # Start after offset table
+        for member_bytes in serialized_members:
             current_offset += len(member_bytes)
             offsets.append(current_offset)
 
@@ -544,7 +590,8 @@ class GclSerializer:
             result += offset.to_bytes(4, byteorder='little')
 
         # Add member data
-        result += member_data
+        for member_bytes in serialized_members:
+            result += member_bytes
 
         return result
 
@@ -560,13 +607,19 @@ class GclSerializer:
         if member_count == 0:
             return {}, current_offset
 
-        # Extract member types
-        member_types = self._extract_struct_member_types(type_name)
+        # Extract member types if specified
+        if type_name == "struct":
+            # Generic struct, we'll need to infer types during deserialization
+            # For now, raise an error as we need type information
+            raise DeserializationError("Cannot deserialize generic 'struct' without type information")
+        else:
+            member_types = self._extract_struct_member_types(type_name)
 
         if member_count != len(member_types):
             raise DeserializationError(f"Struct member count mismatch: expected {len(member_types)}, got {member_count}")
 
         # Read offset table
+        offset_table_start = current_offset
         self._check_data_length(data, current_offset, member_count * 4)
         offsets = []
         for i in range(member_count):
@@ -575,24 +628,25 @@ class GclSerializer:
             current_offset += 4
 
         # Read members using offsets
+        # Offsets are from start of offset table to tail of each member
         members = {}
-        members_start = current_offset
         for i in range(member_count):
+            # Calculate member start position
             if i == 0:
-                member_start = 0
+                member_start = offset_table_start + (member_count * 4)  # After offset table
             else:
-                member_start = offsets[i - 1] - (member_count * 4)  # Convert to relative offset
-
-            member_end = offsets[i] - (member_count * 4)  # Convert to relative offset
-            member_data = data[members_start + member_start:members_start + member_end]
-
+                member_start = offset_table_start + offsets[i - 1]
+            
+            # Deserialize member
             member_type = member_types[i]
-            member_value, _ = self.deserialize(member_type, member_data, 0)
+            member_value, _ = self.deserialize(member_type, data, member_start)
+            
+            # Use generic member names (member_0, member_1, ...)
             members[f"member_{i}"] = member_value
 
         # Update current_offset to end of last member
         if member_count > 0:
-            current_offset = members_start + offsets[-1] - (member_count * 4)
+            current_offset = offset_table_start + offsets[-1]
 
         return members, current_offset
 
@@ -627,6 +681,40 @@ class GclSerializer:
         return member_types
 
     # Helper methods
+
+    def _infer_type(self, value: Any) -> str:
+        """Infer GCL type from Python value."""
+        if isinstance(value, bool):
+            return "bool"
+        elif isinstance(value, int):
+            if value < 0:
+                return "int32"
+            else:
+                return "uint32"
+        elif isinstance(value, float):
+            return "float256"
+        elif isinstance(value, str):
+            return "string"
+        elif isinstance(value, bytes):
+            if len(value) == 32:
+                return "hash"
+            elif len(value) == 36:
+                return "blob"
+            else:
+                return "string"
+        elif isinstance(value, list):
+            if len(value) == 0:
+                return "array<uint32>"
+            else:
+                element_type = self._infer_type(value[0])
+                return f"array<{element_type}>"
+        elif isinstance(value, dict):
+            if "id" in value and "amount" in value:
+                return "token"
+            else:
+                return "struct"
+        else:
+            raise TypeValidationError(f"Cannot infer type for value: {value}")
 
     def _is_uint_type(self, type_name: str) -> bool:
         """Check if type is unsigned integer."""
