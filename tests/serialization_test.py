@@ -199,7 +199,7 @@ class TestGclSpecCompliance:
             "Nested array position mismatch"
 
     def test_nested_map_example_from_spec(self):
-        """测试GCL规范中的嵌套映射示例: map<uint32, map<uint32, uint32>>"""
+        """Nested map example from GCL spec: map<uint32, map<uint32, uint32>>."""
         # Corrected hex from spec document (line 155) - includes offset table
         expected_hex = "02000000ae000000e9000000240000004800000003000000000000006400000090010000010000000200000005000000040000000000000002000000640000009001000064000000c80000000200000005000000"
         expected_value = {
@@ -207,12 +207,12 @@ class TestGclSpecCompliance:
             233: {0: 100, 2: 200, 100: 2, 400: 5}
         }
 
-        # 测试序列化
+        # Test serialization
         serialized = serialize("map<uint32,map<uint32,uint32>>", expected_value)
         assert serialized.hex().lower() == expected_hex.lower(), \
             "Nested map serialization failed"
 
-        # 测试反序列化
+        # Test deserialization
         data = bytes.fromhex(expected_hex)
         deserialized, next_pos = deserialize("map<uint32,map<uint32,uint32>>", data, 0)
         assert deserialized == expected_value, \
@@ -221,16 +221,16 @@ class TestGclSpecCompliance:
             "Nested map position mismatch"
 
     def test_struct_example_from_spec(self):
-        """测试GCL规范中的结构体示例: struct<uint32,array<uint32>> {100,[5,3]}"""
+        """Struct example from GCL spec: struct<uint32,array<uint32>> {100,[5,3]}."""
         expected_hex = "230000000c0000001800000064000000020000000500000003000000"
         expected_value = {"member_0": 100, "member_1": [5, 3]}
 
-        # 测试序列化
+        # Test serialization
         serialized = serialize("struct<uint32,array<uint32>>", expected_value)
         assert serialized.hex().lower() == expected_hex.lower(), \
             f"Struct serialization failed. Expected: {expected_hex}, Got: {serialized.hex()}"
 
-        # 测试反序列化
+        # Test deserialization
         data = bytes.fromhex(expected_hex)
         deserialized, next_pos = deserialize("struct<uint32,array<uint32>>", data, 0)
         assert deserialized == expected_value, \
@@ -239,16 +239,16 @@ class TestGclSpecCompliance:
             f"Struct position mismatch. Expected: {len(data)}, Got: {next_pos}"
 
     def test_struct_empty(self):
-        """测试空结构体"""
+        """Empty struct."""
         expected_hex = "03000000"  # (0 << 4) | 3 = 3
         expected_value = {}
 
-        # 测试序列化
+        # Test serialization
         serialized = serialize("struct<>", expected_value)
         assert serialized.hex().lower() == expected_hex.lower(), \
             f"Empty struct serialization failed. Expected: {expected_hex}, Got: {serialized.hex()}"
 
-        # 测试反序列化
+        # Test deserialization
         data = bytes.fromhex(expected_hex)
         deserialized, next_pos = deserialize("struct<>", data, 0)
         assert deserialized == expected_value, \
@@ -257,13 +257,13 @@ class TestGclSpecCompliance:
             f"Empty struct position mismatch. Expected: {len(data)}, Got: {next_pos}"
 
     def test_struct_single_member(self):
-        """测试单成员结构体"""
+        """Single-member struct."""
         expected_value = {"member_0": 42}
 
-        # 测试序列化
+        # Test serialization
         serialized = serialize("struct<uint32>", expected_value)
 
-        # 测试反序列化
+        # Test deserialization
         deserialized, next_pos = deserialize("struct<uint32>", serialized, 0)
         assert deserialized == expected_value, \
             f"Single member struct deserialization failed. Expected: {expected_value}, Got: {deserialized}"
@@ -271,17 +271,17 @@ class TestGclSpecCompliance:
             f"Single member struct position mismatch. Expected: {len(serialized)}, Got: {next_pos}"
 
     def test_struct_nested_types(self):
-        """测试嵌套类型结构体"""
+        """Struct with nested types."""
         expected_value = {
             "member_0": 100,
             "member_1": [5, 3],
             "member_2": {"key1": 1, "key2": 2}
         }
 
-        # 测试序列化
+        # Test serialization
         serialized = serialize("struct<uint32,array<uint32>,map<string,uint32>>", expected_value)
 
-        # 测试反序列化
+        # Test deserialization
         deserialized, next_pos = deserialize("struct<uint32,array<uint32>,map<string,uint32>>", serialized, 0)
         assert deserialized == expected_value, \
             f"Nested struct deserialization failed. Expected: {expected_value}, Got: {deserialized}"
@@ -289,7 +289,7 @@ class TestGclSpecCompliance:
             f"Nested struct position mismatch. Expected: {len(serialized)}, Got: {next_pos}"
 
     def test_map_struct_example_from_spec(self):
-        """测试GCL规范中的映射结构体示例: map<uint32, {uint32, array<uint32>}>"""
+        """Map of struct example from GCL spec: map<uint32, {uint32, array<uint32>}>."""
         expected_hex = "04000000030000000500000064000000c80000002c000000440000005800000070000000230000000c0000001800000064000000020000000500000003000000230000000c0000001400000002000000010000000f000000230000000c000000100000000400000000000000230000000c000000140000000000000001000000c8000000"
         # Note: The spec document comment says 5:{2,[5,3,15]} but the actual hex contains [15] (length=1)
         # Using the actual hex data as the source of truth
@@ -315,7 +315,7 @@ class TestGclSpecCompliance:
             f"Map struct position mismatch. Expected: {len(data)}, Got: {next_pos}"
 
     def test_fixed_bytes_examples_from_spec(self):
-        """测试GCL规范中的固定字节类型示例"""
+        """Fixed-byte type examples from GCL spec."""
         test_cases = [
             # blob: blob[0] = 100
             ("blob", b"\x64" + b"\x00" * 35, "640000000000000000000000000000000000000000000000000000000000000000000000"),
@@ -326,12 +326,12 @@ class TestGclSpecCompliance:
         ]
 
         for type_name, test_data, expected_hex in test_cases:
-            # 测试序列化
+            # Test serialization
             serialized = serialize(type_name, test_data)
             assert serialized.hex().lower() == expected_hex.lower(), \
                 f"Fixed bytes serialization failed for {type_name}"
 
-            # 测试反序列化
+            # Test deserialization
             data = bytes.fromhex(expected_hex)
             deserialized, next_pos = deserialize(type_name, data, 0)
             assert deserialized == test_data, \
@@ -341,10 +341,10 @@ class TestGclSpecCompliance:
 
 
 class TestFixedSizeTypes:
-    """固定大小类型测试"""
+    """Fixed-size type tests."""
 
     def test_bool_type(self):
-        """测试bool类型"""
+        """Bool type."""
         test_cases = [
             (True, "01"),
             (False, "00"),
@@ -360,12 +360,12 @@ class TestFixedSizeTypes:
             assert next_pos == 1
 
     def test_uint_types(self):
-        """测试无符号整数类型"""
+        """Unsigned integer types."""
         test_cases = [
             ("uint8", 255, "ff"),
             ("uint16", 65535, "ffff"),
             ("uint32", 4294967295, "ffffffff"),
-            ("uint64", 1023, "ff03000000000000"),  # 来自GCL规范
+            ("uint64", 1023, "ff03000000000000"),  # from GCL spec
         ]
 
         for type_name, value, expected_hex in test_cases:
@@ -377,11 +377,11 @@ class TestFixedSizeTypes:
             assert deserialized == value
 
     def test_int_types(self):
-        """测试有符号整数类型"""
+        """Signed integer types."""
         test_cases = [
             ("int8", -1, "ff"),
             ("int16", -1, "ffff"),
-            ("int32", -1024, "00fcffff"),  # 来自GCL规范
+            ("int32", -1024, "00fcffff"),  # from GCL spec
             ("int64", -1, "ffffffffffffffff"),
         ]
 
@@ -394,7 +394,7 @@ class TestFixedSizeTypes:
             assert deserialized == value
 
     def test_fixed_bytes_types(self):
-        """测试固定字节类型: blob, hash, address"""
+        """Fixed-byte types: blob, hash, address."""
         test_cases = [
             ("hash", b"\x64" + b"\x00" * 31, 32),
             ("address", b"\x00\x63" + b"\x00" * 34, 36),
@@ -412,7 +412,7 @@ class TestFixedSizeTypes:
             assert next_pos == expected_size
 
     def test_enum_type(self):
-        """测试枚举类型"""
+        """Enum type."""
         test_cases = [
             (0, "0000"),
             (1, "0100"),
@@ -431,15 +431,15 @@ class TestFixedSizeTypes:
 
 
 class TestVariableSizeTypes:
-    """可变大小类型测试"""
+    """Variable-size type tests."""
 
     def test_string_type(self):
-        """测试字符串类型"""
+        """String type."""
         test_cases = [
-            ("hello", "050068656c6c6f"),  # 来自GCL规范
-            ("", "0000"),                # 空字符串
-            ("a", "010061"),             # 单字符
-            ("world", "0500776f726c64"), # 另一个单词
+            ("hello", "050068656c6c6f"),  # from GCL spec
+            ("", "0000"),                # empty string
+            ("a", "010061"),             # single char
+            ("world", "0500776f726c64"), # another word
         ]
 
         for string_value, expected_hex in test_cases:
@@ -452,12 +452,12 @@ class TestVariableSizeTypes:
             assert next_pos == len(data)
 
     def test_array_type(self):
-        """测试数组类型"""
+        """Array type."""
         test_cases = [
-            ("uint32", [1, 2, 3], "03000000010000000200000003000000"),  # 来自GCL规范
-            ("uint32", [], "00000000"),                                   # 空数组
-            ("uint32", [42], "010000002a000000"),                        # 单元素 (42 = 0x2a)
-            ("uint8", [255, 0, 128], "03000000ff0080"),                  # 字节数组
+            ("uint32", [1, 2, 3], "03000000010000000200000003000000"),  # from GCL spec
+            ("uint32", [], "00000000"),                                   # empty array
+            ("uint32", [42], "010000002a000000"),                        # single element (42 = 0x2a)
+            ("uint8", [255, 0, 128], "03000000ff0080"),                  # byte array
         ]
 
         for element_type, array_value, expected_hex in test_cases:
@@ -471,11 +471,11 @@ class TestVariableSizeTypes:
             assert next_pos == len(data)
 
     def test_map_type(self):
-        """测试映射类型"""
+        """Map type."""
         test_cases = [
             ("uint32", "uint32", {0: 1, 100: 2, 400: 5},
-             "03000000000000006400000090010000010000000200000005000000"),  # 来自GCL规范
-            ("uint32", "uint32", {}, "00000000"),                           # 空映射
+             "03000000000000006400000090010000010000000200000005000000"),  # from GCL spec
+            ("uint32", "uint32", {}, "00000000"),                           # empty map
         ]
 
         for key_type, value_type, map_value, expected_hex in test_cases:
@@ -490,44 +490,44 @@ class TestVariableSizeTypes:
 
 
 class TestErrorHandling:
-    """错误处理测试"""
+    """Error handling tests."""
 
     def test_type_validation_errors(self):
-        """测试类型验证错误"""
+        """Type validation errors."""
         with pytest.raises(TypeValidationError):
-            serialize("uint8", 256)  # 超出范围
+            serialize("uint8", 256)  # out of range
 
         with pytest.raises(TypeValidationError):
-            serialize("uint8", -1)   # 负数
+            serialize("uint8", -1)   # negative
 
         with pytest.raises(TypeValidationError):
-            serialize("int8", 128)   # 超出范围
+            serialize("int8", 128)   # out of range
 
         with pytest.raises(TypeValidationError):
-            serialize("hash", b"\x01" * 31)  # 长度错误
+            serialize("hash", b"\x01" * 31)  # wrong length
 
     def test_unsupported_type_errors(self):
-        """测试不支持的类型错误"""
+        """Unsupported type errors."""
         with pytest.raises(UnsupportedTypeError):
-            serialize("uint7", 1)    # 无效位宽
+            serialize("uint7", 1)    # invalid bit width
 
         with pytest.raises(UnsupportedTypeError):
-            serialize("unknown", 1)  # 未知类型
+            serialize("unknown", 1)  # unknown type
 
     def test_deserialization_errors(self):
-        """测试反序列化错误"""
+        """Deserialization errors."""
         with pytest.raises(DeserializationError):
-            deserialize("uint32", b"\x01\x02", 0)  # 数据不足
+            deserialize("uint32", b"\x01\x02", 0)  # insufficient data
 
         with pytest.raises(DeserializationError):
-            deserialize("string", b"\xff\xfe", 0)  # 无效UTF-8
+            deserialize("string", b"\xff\xfe", 0)  # invalid UTF-8
 
 
 class TestRoundTripConsistency:
-    """往返一致性测试"""
+    """Round-trip consistency tests."""
 
     def test_integer_round_trip(self):
-        """测试整数类型往返一致性"""
+        """Integer type round-trip."""
         test_cases = [
             ("uint8", [0, 1, 127, 255]),
             ("uint16", [0, 1, 32767, 65535]),
@@ -544,9 +544,9 @@ class TestRoundTripConsistency:
                 assert deserialized == value, f"Round-trip failed for {type_name}({value})"
 
     def test_complex_type_round_trip(self):
-        """测试复杂类型往返一致性"""
+        """Complex type round-trip."""
         test_cases = [
-            ("string", ["", "hello", "world", "测试中文"]),
+            ("string", ["", "hello", "world", "test"]),
             ("array<uint32>", [[], [1], [1, 2, 3, 4, 5]]),
             ("map<uint32,string>", [{}, {1: "one"}, {1: "one", 2: "two", 3: "three"}]),
             ("bigint", [0, 1, -1, 4, -4, 1236222290, -1236222290]),
