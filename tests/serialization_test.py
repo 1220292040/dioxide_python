@@ -1,6 +1,6 @@
 """
-GCL数据序列化测试
-基于GCL规范的完整测试用例
+GCL data serialization tests.
+Full test cases based on GCL specification.
 """
 
 import pytest
@@ -11,10 +11,10 @@ from dioxide_python_sdk.utils.serializer import (
 
 
 class TestGclSpecCompliance:
-    """GCL规范符合性测试"""
+    """GCL spec compliance tests."""
 
     def test_integer_examples_from_spec(self):
-        """测试GCL规范中的整数示例"""
+        """Integer examples from GCL spec."""
         test_cases = [
             ("int32", -1024, "00fcffff"),
             ("int128", -1024, "00fcffffffffffffffffffffffffffff"),
@@ -23,12 +23,12 @@ class TestGclSpecCompliance:
         ]
 
         for type_name, value, expected_hex in test_cases:
-            # 测试序列化
+            # Test serialization
             serialized = serialize(type_name, value)
             assert serialized.hex().lower() == expected_hex.lower(), \
                 f"Serialization failed for {type_name}({value})"
 
-            # 测试反序列化
+            # Test deserialization
             data = bytes.fromhex(expected_hex)
             deserialized, next_pos = deserialize(type_name, data, 0)
             assert deserialized == value, \
@@ -37,7 +37,7 @@ class TestGclSpecCompliance:
                 f"Position mismatch for {type_name}"
 
     def test_float_examples_from_spec(self):
-        """测试GCL规范中的浮点数示例"""
+        """Float examples from GCL spec."""
         test_cases = [
             ("float256", 1.0),
             ("float256", 0.0),
@@ -58,31 +58,31 @@ class TestGclSpecCompliance:
                 f"Float deserialization should advance by {expected_size} bytes"
 
     def test_float1024_basic_functionality(self):
-        """测试float1024基本功能"""
-        # 测试序列化
+        """Basic functionality for float1024."""
+        # Test serialization
         serialized = serialize("float1024", 1.0)
         assert len(serialized) == 132, f"float1024 should be 132 bytes, got {len(serialized)}"
 
-        # 测试反序列化
+        # Test deserialization
         deserialized, next_pos = deserialize("float1024", serialized, 0)
         assert next_pos == 132, "float1024 deserialization should advance by 132 bytes"
 
-        # 测试零值
+        # Test zero value
         zero_serialized = serialize("float1024", 0.0)
         zero_deserialized, _ = deserialize("float1024", zero_serialized, 0)
         assert zero_deserialized == 0.0, "float1024 zero value test failed"
 
     def test_array_example_from_spec(self):
-        """测试GCL规范中的数组示例: array<uint32> [1,2,3]"""
+        """Array example from GCL spec: array<uint32> [1,2,3]."""
         expected_hex = "03000000010000000200000003000000"
         expected_value = [1, 2, 3]
 
-        # 测试序列化
+        # Test serialization
         serialized = serialize("array<uint32>", expected_value)
         assert serialized.hex().lower() == expected_hex.lower(), \
             "Array serialization failed"
 
-        # 测试反序列化
+        # Test deserialization
         data = bytes.fromhex(expected_hex)
         deserialized, next_pos = deserialize("array<uint32>", data, 0)
         assert deserialized == expected_value, \
@@ -91,16 +91,16 @@ class TestGclSpecCompliance:
             "Array position mismatch"
 
     def test_map_example_from_spec(self):
-        """测试GCL规范中的映射示例: map<uint32,uint32> {0:1,100:2,400:5}"""
+        """Map example from GCL spec: map<uint32,uint32> {0:1,100:2,400:5}."""
         expected_hex = "03000000000000006400000090010000010000000200000005000000"
         expected_value = {0: 1, 100: 2, 400: 5}
 
-        # 测试序列化
+        # Test serialization
         serialized = serialize("map<uint32,uint32>", expected_value)
         assert serialized.hex().lower() == expected_hex.lower(), \
             "Map serialization failed"
 
-        # 测试反序列化
+        # Test deserialization
         data = bytes.fromhex(expected_hex)
         deserialized, next_pos = deserialize("map<uint32,uint32>", data, 0)
         assert deserialized == expected_value, \
@@ -109,16 +109,16 @@ class TestGclSpecCompliance:
             "Map position mismatch"
 
     def test_string_example_from_spec(self):
-        """测试GCL规范中的字符串示例: "hello" """
+        """String example from GCL spec: \"hello\"."""
         expected_hex = "050068656c6c6f"
         expected_value = "hello"
 
-        # 测试序列化
+        # Test serialization
         serialized = serialize("string", expected_value)
         assert serialized.hex().lower() == expected_hex.lower(), \
             "String serialization failed"
 
-        # 测试反序列化
+        # Test deserialization
         data = bytes.fromhex(expected_hex)
         deserialized, next_pos = deserialize("string", data, 0)
         assert deserialized == expected_value, \
@@ -127,16 +127,16 @@ class TestGclSpecCompliance:
             "String position mismatch"
 
     def test_token_example_from_spec(self):
-        """测试GCL规范中的token示例: id=1, amount=4"""
+        """Token example from GCL spec: id=1, amount=4."""
         expected_hex = "0100000000000000010400000000000000"
         expected_value = {"id": 1, "amount": 4}
 
-        # 测试序列化
+        # Test serialization
         serialized = serialize("token", expected_value)
         assert serialized.hex().lower() == expected_hex.lower(), \
             "Token serialization failed"
 
-        # 测试反序列化
+        # Test deserialization
         data = bytes.fromhex(expected_hex)
         deserialized, next_pos = deserialize("token", data, 0)
         assert deserialized == expected_value, \
@@ -145,32 +145,32 @@ class TestGclSpecCompliance:
             "Token position mismatch"
 
     def test_bigint_examples_from_spec(self):
-        """测试GCL规范中的bigint示例"""
-        # 正数bigint示例
+        """Bigint examples from GCL spec."""
+        # Positive bigint example
         positive_spec_hex = "03c7711cc7711c0b4de3051d6b170fb62c38743f9a07000000"
 
-        # 测试反序列化结构
+        # Test deserialization structure
         data = bytes.fromhex(positive_spec_hex)
         deserialized, next_pos = deserialize("bigint", data, 0)
 
-        # 验证是正数且有正确的结构
+        # Verify positive and correct structure
         assert isinstance(deserialized, int), "Bigint should be integer"
         assert deserialized > 0, "Spec example should be positive"
         assert next_pos == len(data), "Position should match data length"
 
-        # 负数bigint示例
+        # Negative bigint example
         negative_spec_hex = "83c7711cc7711c0b4de3051d6b170fb62c38743f9a07000000"
 
-        # 测试反序列化结构
+        # Test deserialization structure
         data = bytes.fromhex(negative_spec_hex)
         deserialized, next_pos = deserialize("bigint", data, 0)
 
-        # 验证是负数且有正确的结构
+        # Verify negative and correct structure
         assert isinstance(deserialized, int), "Bigint should be integer"
         assert deserialized < 0, "Spec example should be negative"
         assert next_pos == len(data), "Position should match data length"
 
-        # 测试简单bigint值的往返
+        # Test simple bigint round-trip
         simple_cases = [
             0, 1, 4, 255, 65535, 4294967295, -1, -4, -255
         ]
@@ -181,16 +181,16 @@ class TestGclSpecCompliance:
             assert deserialized == value, f"Bigint round-trip failed for {value}"
 
     def test_nested_array_example_from_spec(self):
-        """测试GCL规范中的嵌套数组示例: array<array<uint32>> [[1,2,3],[1,2],[1,2,4]]"""
+        """Nested array example from GCL spec: array<array<uint32>> [[1,2,3],[1,2],[1,2,4]]."""
         expected_hex = "030000001c00000028000000380000000300000001000000020000000300000002000000010000000200000003000000010000000200000004000000"
         expected_value = [[1, 2, 3], [1, 2], [1, 2, 4]]
 
-        # 测试序列化
+        # Test serialization
         serialized = serialize("array<array<uint32>>", expected_value)
         assert serialized.hex().lower() == expected_hex.lower(), \
             "Nested array serialization failed"
 
-        # 测试反序列化
+        # Test deserialization
         data = bytes.fromhex(expected_hex)
         deserialized, next_pos = deserialize("array<array<uint32>>", data, 0)
         assert deserialized == expected_value, \
