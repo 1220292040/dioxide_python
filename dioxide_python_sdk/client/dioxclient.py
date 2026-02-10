@@ -104,39 +104,39 @@ class DioxClient:
 #rpc method ----------------------------------------------------------------
     """
     @description:
-        返回区块链整体信息
+        Return chain overview.
     @params:
         None
     @response -- object:
-        VersionName: string - 区块链版本号名称/网络类型
-        DeployName: string - 区块链部署网络的名称,[区块链版本号名称]+'@dioxide'
-        ChainVersion: uint8 -  区块链版本号
-        Time: uint64 - 当前网络时间
-        BlockTime: uint64 - 当前chainhead的区块时间戳
-        ShardOrder: uint32 - 分片数量阶,分片数量 = 1+(1<<ShardOrder)
-        ShardOnDuty: array - [分片起始序号,正常运行的分片数量]
-        BlackListSize: uint64 - 区块黑名单的数量(不接收该哈希值对应的区块)
-        ScalingOut: bool - 是否正在执行scale-out(分片扩展)
-        Rebase: bool - 是否正在执行rebase操作
-        BlockFallBehind: uint32 - 当前节点高度与从区块链网络中接收到最新区块的高度差值
-        BaseHeight: uint64 - 区块链的基准高度(rebase操作会影响基准高度值)
-        HeadHash: string - 主链上最新区块的master block hash(base32编码)
-        HeadHeight: uint64 - 主链最新高度
-        FinalizedBlock:array - [最近被finalize的block_hash,最近被finalize的block_height]
-        ArchivedHeight: array - [最近被archive的block_hash,最近被archive的block_height]
-        AvgGasPrice: string - 区块交易平均gas fee
-        TxnCount: array - [ScheduledTxnCount,ConfirmedTxnCount,IntraRelayTxnCount,InboundRelayTxnCount,OutboundRelayTxnCount,DeferredTxnCount]
+        VersionName: string - chain version/network type
+        DeployName: string - deploy name, [VersionName]+'@dioxide'
+        ChainVersion: uint8 - chain version
+        Time: uint64 - current network time
+        BlockTime: uint64 - current chainhead block timestamp
+        ShardOrder: uint32 - shard order, shard count = 1+(1<<ShardOrder)
+        ShardOnDuty: array - [shard start index, running shard count]
+        BlackListSize: uint64 - block blacklist size
+        ScalingOut: bool - whether scale-out is in progress
+        Rebase: bool - whether rebase is in progress
+        BlockFallBehind: uint32 - height lag vs network latest
+        BaseHeight: uint64 - chain base height (rebase affects this)
+        HeadHash: string - latest master block hash (base32)
+        HeadHeight: uint64 - latest height
+        FinalizedBlock: array - [last finalized block_hash, block_height]
+        ArchivedHeight: array - [last archived block_hash, block_height]
+        AvgGasPrice: string - avg gas fee
+        TxnCount: array - [ScheduledTxnCount,ConfirmedTxnCount,...]
 
-        如果不是在节点rebase期间,还会返回如下参数：
-        IdAllocated: array - [目前已分配的最大block id,允许分配的最大block id],block id是区块在内存中的序号
-        Throughput: float - 吞吐量
-        BlockInterval: float -  出块间隔(ms)
-        HashRate: uint64 - 哈希速率
-        ForkRate: float - 分叉率
-        FinalityDistance: uint64 - 最后一个finalize的区块高度距离当前最新高度的差值
-        Difficulty: uint64: pow难度
-        Global: object - global shard的信息,包括throughput,txcount等
-        Shards: array - per shard 信息
+        When not in rebase, also returns:
+        IdAllocated: array - [max allocated block id, max allowed block id]
+        Throughput: float - throughput
+        BlockInterval: float - block interval (ms)
+        HashRate: uint64 - hash rate
+        ForkRate: float - fork rate
+        FinalityDistance: uint64 - distance from latest to last finalized
+        Difficulty: uint64 - pow difficulty
+        Global: object - global shard info (throughput, txcount, etc.)
+        Shards: array - per-shard info
     """
     @exception_handler
     def get_overview(self):
@@ -145,11 +145,11 @@ class DioxClient:
 
     """
     @description:
-        返回当前区块高度
+        Return current block height.
     @params:
         None
     @response -- int:
-        返回当前节点所同步到的最新区块高度
+        Latest block height synced by this node.
     """
     @exception_handler
     def get_block_number(self):
@@ -158,12 +158,12 @@ class DioxClient:
 
     """
     @description:
-        返回指定key所在的shard_index
+        Return shard_index for the given key.
     @params:
         scope: global/shard/address/uds(user define scope)
-        scope_key:对应scope的key,如果scope是global,该字段可以为空
+        scope_key: key for scope; may be empty if scope is global
     @response -- int:
-        返回对应key所在的shard序号
+        Shard index for the key.
     """
     @exception_handler
     def get_shard_index(self,scope,scope_key):
@@ -176,11 +176,11 @@ class DioxClient:
 
     """
     @description:
-        返回地址对应的isn(类似以太坊的nonce)
+        Return ISN for address (like Ethereum nonce).
     @params:
-        address: 地址,可以是用户地址也可以是dapp和token的地址
+        address: user/dapp/token address
     @response -- int:
-        返回地址对应的isn序号
+        ISN for the address.
     """
     @exception_handler
     def get_isn(self,address):
@@ -192,43 +192,17 @@ class DioxClient:
 
     """
     @description:
-        根据高度获取consensus_header
+        Get consensus_header by height.
     @params:
-        height: 高度
+        height: block height
     @response -- object:
-        Size: 区块大小(Byte),
-        Version: 链版本,
-        Prev: 父区块哈希,
-        Height: 高度,
-        ShardOrder: 分片数量的阶(分片数量 = 2^ShardOrder),
-        Timestamp: 时间戳,
-        ScheduledTxnCount: schedule txn的数量,
-        UserInitiatedTxnCount: 用户发起的交易数量,
-        IntraRelayTxnCount: intra relay txn的数量,
-        InboundRelayTxnCount: inbound relay txn数量,
-        OutboundRelayTxnCount: outbound relay txn数量,
-        DeferredRelayTxnCount: deferred relay txn数量,
-        ShardBlockMerkle: 所有shard的txnblock hash组成的merkle tree root,
-        ShardChainStateMerkle: 所有shard的txnblock中的ChainStateMerkle组成的merkle tree root,
-        ShardProcessedTxnMerkle: 所有shard的txnblock中的transaction merkle tree root组成的merkle tree root,
-        ShardOutboundRelayMerkle: 所有shard的txnblock中的outbound relay transaction merkle tree root组成的merkle tree root,
-        GlobalChainStateMerkle: global shard的状态变更树树根,
-        GlobalProcessedTxnMerkle: global shard的交易树树根,
-        Consensus: 共识类型,
-        Miner: 矿工地址,
-        TotalGasFee: 总gasfee消耗,
-        AvgGasPrice: 平均gasprice,
-        ScalingNext: 是否进行分片扩展,
-        SnapshotCarried: 是否携带snapshot,
-        Uncles: 叔块哈希,
-        PowDifficulty: 难度,
-        PowNonce: nonce值,
-        Hash: 区块哈希,
-        BlockInterval:出块间隔,
-        Throughput: tps,
-        ForkRate: 分叉率,
-        Stage: 区块状态,
-        DispatchedRelayTxnCount: dispatch relay的数量
+        Size, Version, Prev, Height, ShardOrder, Timestamp,
+        ScheduledTxnCount, UserInitiatedTxnCount, IntraRelayTxnCount, etc.,
+        ShardBlockMerkle, ShardChainStateMerkle, ShardProcessedTxnMerkle,
+        ShardOutboundRelayMerkle, GlobalChainStateMerkle, GlobalProcessedTxnMerkle,
+        Consensus, Miner, TotalGasFee, AvgGasPrice, ScalingNext, SnapshotCarried,
+        Uncles, PowDifficulty, PowNonce, Hash, BlockInterval, Throughput,
+        ForkRate, Stage, DispatchedRelayTxnCount
     """
     @exception_handler
     def get_consensus_header_by_height(self,height):
@@ -241,11 +215,11 @@ class DioxClient:
 
     """
     @description:
-        根据区块哈希获取consensus_header
+        Get consensus_header by block hash.
     @params:
-        hash: 哈希
+        hash: block hash
     @response -- object:
-        同上
+        Same as get_consensus_header_by_height.
     """
     @exception_handler
     def get_consensus_header_by_hash(self,hash:str):
@@ -258,33 +232,16 @@ class DioxClient:
 
     """
     @description:
-        根据分片序号和区块高度获取transaction block
+        Get transaction block by shard index and height.
     @params:
-        shard_index:分片序号
-        height: 高度
+        shard_index: shard index
+        height: block height
     @response -- object:
-        Size: 区块大小,
-        Version: 区块链版本,
-        Scope: 作用域,区分global和normal shard,
-        Shard: [当前shard_index, shard_order]
-        Prev: 父区块哈希,
-        ScheduledTxnCount: schedule txn数量,
-        UserInitiatedTxnCount: 用户发起的交易数量,
-        IntraRelayTxnCount: intra relay交易数量,
-        InboundRelayTxnCount: inbound relay交易数量,
-        OutboundRelayTxnCount: outbound relay交易数量,
-        DeferredRelayTxnCount: deffered relay交易数量,
-        DispatchedRelayTxnCount: dispatch relay交易数量,
-        ExecutionCount: 交易执行数量,
-        ConsensusHeaderHash: consensus_header的哈希,
-        ConfirmedTxnMerkle: 交易树树根,
-        ChainStateMerkle": 状态改变树树根,
-        Hash: 区块哈希,
-        Height: 区块高度,
-        Timestamp: 时间戳,
-        Miner: 矿工,
-        State: 区块状态,
-        Transactions: 交易集合
+        Size, Version, Scope, Shard, Prev, ScheduledTxnCount,
+        UserInitiatedTxnCount, IntraRelayTxnCount, InboundRelayTxnCount,
+        OutboundRelayTxnCount, DeferredRelayTxnCount, DispatchedRelayTxnCount,
+        ExecutionCount, ConsensusHeaderHash, ConfirmedTxnMerkle, ChainStateMerkle,
+        Hash, Height, Timestamp, Miner, State, Transactions
     """
     @exception_handler
     def get_transaction_block_by_height(self,shard_index,height):
@@ -298,12 +255,12 @@ class DioxClient:
 
     """
     @description:
-        根据分片序号和区块哈希获取transaction block
+        Get transaction block by shard index and block hash.
     @params:
-        shard_index:分片序号
-        height: 高度
+        shard_index: shard index
+        hash: block hash
     @response -- object:
-        同上
+        Same as get_transaction_block_by_height.
     """
     @exception_handler
     def get_transaction_block_by_hash(self,shard_index,hash:str):
@@ -317,23 +274,12 @@ class DioxClient:
 
     """
     @description:
-        根据交易哈希获取交易
+        Get transaction by hash.
     @params:
-        hash:交易哈希
+        hash: transaction hash
     @response -- object:
-        Hash: 交易哈希,
-        GasOffered: 交易的gaslimit,
-        GasPrice": 交易的gasprice,
-        Grouped: 是否是relay group类型,
-        uTxnSize: 交易大小(Bytes),
-        Mode:  类型,
-        Function: 调用的合约函数,
-        Input: 输入参数,
-        Invocation: 调用信息
-        Stage": 交易状态,
-        Height: 交易所在区块高度,
-        Shard: [交易所在分片,ShardOrder],
-        ConfirmState: 交易状态
+        Hash, GasOffered, GasPrice, Grouped, uTxnSize, Mode,
+        Function, Input, Invocation, Stage, Height, Shard, ConfirmState
     """
     @exception_handler
     def get_transaction(self,hash:str,shard_index=None):
@@ -355,18 +301,17 @@ class DioxClient:
 
     """
     @description:
-        合成交易,将交易的各字段合成成字节流形式,后续加入签名后发送到链上
+        Compose transaction: pack fields into bytes for signing and sending.
     @params:
-        sender: 发送者
-        function: 调用的合约函数(<dapp>.<contract>.<function>)
-        args: 函数调用参数,object
-        isn: 交易isn,不填默认为最新isn,同以太坊nonce
-        is_delegatee: 是否是委托交易
-        gas_price: 设置交易gas_price
-        gas_limit: 设置交易gas_limit
+        sender: sender address
+        function: contract function (<dapp>.<contract>.<function>)
+        args: function args, object
+        isn: transaction ISN (default latest, like Ethereum nonce)
+        is_delegatee: whether delegated tx
+        gas_price: gas price
+        gas_limit: gas limit
     @response -- bytes
-        合成的交易base64编码
-        
+        Composed transaction, base64 decoded.
     """
     @exception_handler
     def compose_transaction(self,sender,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,gas_price=None,gas_limit=None,ttl=None):
@@ -393,20 +338,20 @@ class DioxClient:
 
     """
     @description:
-        本地构建交易,不依赖RPC调用,按照解析交易的相反逻辑实现
+        Build transaction locally without RPC (inverse of parse logic).
     @params:
-        sender: 发送者地址或DioxAccount对象
-        function: 调用的合约函数(<dapp>.<contract>.<function>)
-        args: 函数调用参数,dict格式,key为参数名
-        signature: 函数签名,格式如"address:to,uint32:amount",如果不提供则从合约信息中获取
-        contract_info: 合约信息对象(可选),如果不提供则通过RPC获取
-        isn: 交易isn,不填默认为最新isn
-        is_delegatee: 是否是委托交易
-        gas_price: 设置交易gas_price
-        gas_limit: 设置交易gas_limit
-        ttl: 交易生存时间
+        sender: sender address or DioxAccount
+        function: contract function (<dapp>.<contract>.<function>)
+        args: function args, dict keyed by param name
+        signature: function signature e.g. "address:to,uint32:amount"; optional, from contract if not provided
+        contract_info: contract info object (optional), from RPC if not provided
+        isn: transaction ISN (default latest)
+        is_delegatee: whether delegated tx
+        gas_price: gas price
+        gas_limit: gas limit
+        ttl: transaction TTL
     @response -- bytes
-        未签名的交易字节流
+        Unsigned transaction bytes.
     """
     @exception_handler
     def compose_transaction_local(self, sender, function: str, args: dict, signature: str = None,
@@ -511,13 +456,13 @@ class DioxClient:
 
     """
     @description:
-        发送签名后的交易
+        Send signed transaction.
     @params:
-        signed_txn: 签名后的交易字节流
-        sync: 是否同步等待返回结果
-        timeout: 超时时间
+        signed_txn: signed transaction bytes
+        sync: wait for result
+        timeout: timeout
     @response -- str
-        交易哈希(base32编码)
+        Transaction hash (base32).
     """
     @exception_handler
     def send_raw_transaction(self,signed_txn:bytes,sync=False,timeout=DEFAULT_TIMEOUT):
@@ -535,20 +480,13 @@ class DioxClient:
 
     """
     @description:
-        根据合约名称获取合约详细信息(类似abi)
+        Get contract details by name (like ABI).
     @params:
-        dapp_name: dapp名称
-        contract_name: 合约名称
+        dapp_name: dapp name
+        contract_name: contract name
     @response -- object
-        ContractID: 合约ID(唯一),
-        ContractVersionID: 合约ID+合约版本号,
-        Contract": 合约名称,
-        Hash: 合约内容哈希值,
-        ImplmentedInterfaces: 合约实现的接口,
-        StateVariables: 合约变量([{'name':<变量名称>,'scope':<变量所属scope>,'dataType':<变量类型>}...]),
-        Scopes: 合约中所有的scope,
-        Interfaces: 合约定义的接口,
-        Functions: 合约定义的所有函数
+        ContractID, ContractVersionID, Contract, Hash, ImplmentedInterfaces,
+        StateVariables, Scopes, Interfaces, Functions
     """
     @exception_handler
     def get_contract_info(self,dapp_name,contract_name):
@@ -559,12 +497,12 @@ class DioxClient:
 
     """
     @description:
-        查询已经部署的合约对应的代码
+        Get source code of deployed contract.
     @params:
-        dapp_name: dapp名称
-        contract_name: 合约名称
+        dapp_name: dapp name
+        contract_name: contract name
     @response -- str
-        返回合约的源代码字符串
+        Contract source code string.
     """
     @exception_handler
     def get_source_code(self,dapp_name,contract_name):
@@ -575,16 +513,16 @@ class DioxClient:
 
     """
     @description:
-        部署合约
+        Deploy contract.
     @params:
-        dapp_name: dapp名称
-        delegator: dapp的所有者,签名账户
-        file_path: 合约文件路径,需要.prd文件
-        source_code: 如果不指定合约文件路径则需要直接给出源码
-        construct_args: 合约构造函数,object
-        compile_time: 合约最长的编译时间,一般不设置
+        dapp_name: dapp name
+        delegator: dapp owner, signing account
+        file_path: path to .prd file
+        source_code: required if file_path not set
+        construct_args: constructor args, object
+        compile_time: max compile time (optional)
     @response -- str
-        合约部署交易哈希
+        Deploy transaction hash.
     """
     @exception_handler
     def deploy_contract(self,dapp_name,delegator:DioxAccount,file_path=None,source_code=None,construct_args:dict=None,compile_time=None):
@@ -617,14 +555,14 @@ class DioxClient:
 
     """
     @description:
-        批量部署合约
+        Deploy multiple contracts.
     @params:
-        dapp_name: dapp名称
-        delegator: dapp的所有者,签名账户
-        contracts: 合约文件绝对路径和构造参数的映射字典, dict[绝对路径, 构造参数]
-        compile_time: 合约最长的编译时间,一般不设置
+        dapp_name: dapp name
+        delegator: dapp owner, signing account
+        contracts: dict mapping absolute path -> constructor args
+        compile_time: max compile time (optional)
     @response -- str
-        合约部署交易哈希
+        Deploy transaction hash.
     """
     @exception_handler
     def deploy_contracts(self,dapp_name,delegator:DioxAccount,contracts:dict[str,dict]=None,compile_time=None):
@@ -684,12 +622,12 @@ class DioxClient:
 
     """
     @description:
-        获取合约状态信息
+        Get contract state.
     @params:
-        contract_with_scope: 想要获取的状态变量scope,可选值有(global | shard | address | uint32 | uint64 | uint128 | uint256| uint512)
-        scope_key: scope对应的key,比如scope是address,则该字段对应的是一个地址,如果是global,该字段为空
+        contract_with_scope: state scope (global | shard | address | uint32 | ...)
+        scope_key: key for scope (e.g. address when scope is address; empty for global)
     @response -- object
-        状态object
+        State object.
     """
     @exception_handler
     def get_contract_state(self,dapp_name,contract_name,scope:Scope,key):
@@ -702,11 +640,11 @@ class DioxClient:
 
     """
     @description:
-        获取dapp信息
+        Get dapp info.
     @params:
-        dapp_name: dapp名称
+        dapp_name: dapp name
     @response -- object
-        DappID: dapp对应的dappid
+        DappID
     """
     @exception_handler
     def get_dapp_info(self,dapp_name):
@@ -717,11 +655,11 @@ class DioxClient:
 
     """
     @description:
-        获取token信息
+        Get token info.
     @params:
-        token_symbol: token名称(全大写)
+        token_symbol: token symbol (uppercase)
     @response -- object
-        TokenId: Token对应的id
+        TokenId
     """
     @exception_handler
     def get_token_info(self,token_symbol):
@@ -733,11 +671,11 @@ class DioxClient:
 
     """
     @description:
-        获取某笔交易中发出的event(relay@external交易)
+        Get events (relay@external) for a transaction.
     @params:
-        txhash: 交易哈希
+        txhash: transaction hash
     @response -- object
-        tx: relay@external对应的交易(里面的input字段需要自行反序列化)
+        tx: relay@external transaction (input field needs deserialization by caller)
     """
     @exception_handler
     def get_events_by_transaction(self,txhash):
@@ -862,17 +800,17 @@ class DioxClient:
 
     """
     @description:
-        创建token
+        Create token.
     @params:
-        @Minter: 发币合约的CID,没有minter或者后续再设置minter填0
-        @MinterFlags: 0-不允许该合约发币(临时性),1-允许该合约发币(临时性),2-不允许该合约发币(永久性),3-允许该合约发币(永久性)
-        @TokenFlags: 0:可以后续设置minter,1不可以后续设置minter
-        @Symbol: 代币名称,全大写,长度3-8
-        @InitSupply:初始发行量
-        @Deposit: 这个代币初始存入的dio数量
+        Minter: minter contract CID; 0 if none or set later
+        MinterFlags: 0=disallow(temporary), 1=allow(temporary), 2=disallow(permanent), 3=allow(permanent)
+        TokenFlags: 0=can set minter later, 1=cannot
+        Symbol: token symbol, uppercase, 3-8 chars
+        InitSupply: initial supply
+        Deposit: initial DIO deposit for this token
     @response -- object
-        状态object
-    @TBD.这些flag换成枚举变量
+        State object.
+    @TBD: use enum for flags
     """
     @exception_handler
     def create_token(self,user:DioxAccount,symbol,initial_supply,deposit,decimals,cid=0,minter_flag=1,token_flag=0,sync=True,timeout=DEFAULT_TIMEOUT):

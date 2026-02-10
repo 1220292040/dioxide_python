@@ -1,5 +1,5 @@
 """
-转账功能测试用例
+Transfer test cases.
 """
 
 import pytest
@@ -8,10 +8,10 @@ from dioxide_python_sdk.client.account import DioxAccount
 
 
 class TestTransfer:
-    """转账功能测试类"""
+    """Transfer test class."""
 
     def setup_method(self):
-        """测试前置设置"""
+        """Setup before each test."""
         self.client = DioxClient()
         self.sender_pk = "pCrlpQ/VSj9pDbHGwdRJx9+Ck/26/LPnVbbUjDi7kfHqdcqDTB8Dd34vpQB4RUO4fP0eQIDAxTYwF/7a6gIr0w=="
         self.sender_account = DioxAccount.from_key(self.sender_pk)
@@ -19,8 +19,8 @@ class TestTransfer:
         self.receiver_account = DioxAccount.from_key(self.receiver_pk)
 
     def test_transfer_dio_token(self):
-        """测试DIO代币转账"""
-        # 执行转账
+        """Test DIO token transfer."""
+        # Execute transfer
         tx_hash = self.client.transfer(
             self.sender_account,
             self.receiver_account.address,
@@ -30,11 +30,11 @@ class TestTransfer:
             timeout=60
         )
 
-        # 验证交易哈希不为空
-        assert tx_hash is not None, "转账应该返回交易哈希"
-        assert isinstance(tx_hash, str), "交易哈希应该是字符串类型"
-        assert len(tx_hash) > 0, "交易哈希不应该为空"
+        # Assert tx hash is not empty
+        assert tx_hash is not None, "Transfer should return tx hash"
+        assert isinstance(tx_hash, str), "Tx hash should be string"
+        assert len(tx_hash) > 0, "Tx hash should not be empty"
 
-        # 验证账户对象已正确创建
-        assert self.sender_account is not None, "发送方账户应该已创建"
-        assert self.receiver_account is not None, "接收方账户应该已创建"
+        # Assert accounts are created
+        assert self.sender_account is not None, "Sender account should be created"
+        assert self.receiver_account is not None, "Receiver account should be created"
