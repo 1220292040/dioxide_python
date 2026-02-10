@@ -301,22 +301,18 @@ class TestGclSpecCompliance:
             200: {"member_0": 0, "member_1": [200]}
         }
 
-        # 注意：当前实现可能不支持结构体，这里先测试基本功能
-        try:
-            serialized = serialize("map<uint32,struct>", expected_value)
-            assert serialized.hex().lower() == expected_hex.lower(), \
-                "Map struct serialization failed"
+        # Test serialization with explicit struct type
+        serialized = serialize("map<uint32,struct<uint32,array<uint32>>>", expected_value)
+        assert serialized.hex().lower() == expected_hex.lower(), \
+            f"Map struct serialization failed. Expected: {expected_hex}, Got: {serialized.hex()}"
 
-            # 测试反序列化
-            data = bytes.fromhex(expected_hex)
-            deserialized, next_pos = deserialize("map<uint32,struct>", data, 0)
-            assert deserialized == expected_value, \
-                "Map struct deserialization failed"
-            assert next_pos == len(data), \
-                "Map struct position mismatch"
-        except UnsupportedTypeError:
-            # 如果结构体不支持，跳过测试
-            pytest.skip("Struct type not yet implemented")
+        # Test deserialization
+        data = bytes.fromhex(expected_hex)
+        deserialized, next_pos = deserialize("map<uint32,struct<uint32,array<uint32>>>", data, 0)
+        assert deserialized == expected_value, \
+            f"Map struct deserialization failed. Expected: {expected_value}, Got: {deserialized}"
+        assert next_pos == len(data), \
+            f"Map struct position mismatch. Expected: {len(data)}, Got: {next_pos}"
 
     def test_fixed_bytes_examples_from_spec(self):
         """测试GCL规范中的固定字节类型示例"""
