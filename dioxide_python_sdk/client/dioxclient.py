@@ -528,7 +528,7 @@ class DioxClient:
     def deploy_contract(self,dapp_name,delegator:DioxAccount,file_path=None,source_code=None,construct_args:dict=None,compile_time=None):
         deploy_args={}
         if file_path is not None:
-            with open(file_path) as f:
+            with open(file_path, encoding='utf-8', errors='replace') as f:
                 deploy_args.update({"code":[f.read()]})
         else:
             if source_code is None or (isinstance(source_code, str) and source_code.strip() == ""):
@@ -578,7 +578,7 @@ class DioxClient:
         for contract_path in contracts.keys():
             # Normalize path to handle different path formats
             normalized_path = os.path.normpath(contract_path)
-            with open(normalized_path) as f:
+            with open(normalized_path, encoding='utf-8', errors='replace') as f:
                 codes.append(f.read())
 
             # Get constructor args for this contract
