@@ -748,11 +748,20 @@ class DioxClient:
 
     #wrapper method ----------------------------------------------------------------
     @exception_handler
-    def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,gas_price=None,gas_limit=None,is_sync=False,timeout=DEFAULT_TIMEOUT):
+    def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,delegatee=None,gas_price=None,gas_limit=None,is_sync=False,timeout=DEFAULT_TIMEOUT):
         sender_addr = user.address
         if ":" not in sender_addr:
             sender_addr = sender_addr + ":" + user.account_type.name.lower()
-        unsigned_txn = self.compose_transaction(sender=sender_addr,
+        
+        if delegatee is not None:
+            is_delegatee = True
+            compose_sender = delegatee
+        elif is_delegatee:
+            compose_sender = sender_addr
+        else:
+            compose_sender = sender_addr
+        
+        unsigned_txn = self.compose_transaction(sender=compose_sender,
                                           function=function,
                                           args=args,
                                           tokens=tokens,
@@ -771,13 +780,13 @@ class DioxClient:
         return tx_hash
 
     @exception_handler
-    def transfer(self,sender:DioxAccount,receiver,amount,token="DIO",sync=True,timeout=DEFAULT_TIMEOUT):
+    def transfer(self,sender:DioxAccount,receiver,amount,token="DIO",delegatee=None,sync=True,timeout=DEFAULT_TIMEOUT):
         args = {
             "To":"{}".format(receiver),
             "Amount":"{}".format(amount),
             "TokenId":"{}".format(token)
         }
-        tx_hash = self.send_transaction(user=sender,function="core.wallet.transfer",args=args,is_sync=sync,timeout=timeout)
+        tx_hash = self.send_transaction(user=sender,function="core.wallet.transfer",args=args,delegatee=delegatee,is_sync=sync,timeout=timeout)
         return tx_hash
 
     @exception_handler
