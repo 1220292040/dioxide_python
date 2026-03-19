@@ -859,6 +859,13 @@ class DioxClient:
             return False
         return True
 
+    def _normalize_relay_hash(self, relay_hash):
+        if ':' in relay_hash:
+            base, suffix = relay_hash.rsplit(':', 1)
+            if suffix.isdigit():
+                return base
+        return relay_hash
+
     def is_tx_confirmed_with_relays(self,tx):
         q = queue.Queue()
         q.put(tx.Hash)
@@ -867,7 +874,7 @@ class DioxClient:
             if not self.is_tx_confirmed(cur_tx):
                 return False
             for relay_tx_hash in cur_tx.Invocation.get("Relays",[]):
-                q.put(relay_tx_hash)
+                q.put(self._normalize_relay_hash(relay_tx_hash))
         return True
 
     def is_tx_success_with_relays(self,tx):
@@ -878,7 +885,7 @@ class DioxClient:
             if not self.is_tx_success(cur_tx):
                 return False
             for relay_tx_hash in cur_tx.Invocation.get("Relays",[]):
-                q.put(relay_tx_hash)
+                q.put(self._normalize_relay_hash(relay_tx_hash))
         return True
 
     def get_all_relay_transactions(self,tx,detail=False):
@@ -888,8 +895,9 @@ class DioxClient:
             q.put(tx)
             while not q.empty():
                 for h in q.get().Invocation.get("Relays",[]):
-                    res.append(self.get_transaction(h) if detail is True else h)
-                    q.put(self.get_transaction(h))
+                    normalized_h = self._normalize_relay_hash(h)
+                    res.append(self.get_transaction(normalized_h) if detail is True else h)
+                    q.put(self.get_transaction(normalized_h))
             return res
         else:
             return None
