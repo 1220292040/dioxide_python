@@ -1,6 +1,6 @@
 [project]
 name = "dioxide-python-sdk"
-version = "0.2.0"
+version = "0.6.0"
 description = "dioxide python SDK"
 authors = [
     {name = "phenix3443",email = "phenix3443@gmail.com"}
