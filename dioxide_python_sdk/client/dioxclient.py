@@ -822,6 +822,74 @@ class DioxClient:
     @TBD: use enum for flags
     """
     @exception_handler
+    def regulation_block(self, regulator: DioxAccount, address: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.regulation.block",
+            args={"Address": address},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def regulation_unblock(self, regulator: DioxAccount, address: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.regulation.unblock",
+            args={"Address": address},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def regulation_set_audit(self, regulator: DioxAccount, contract_id_raw: int, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.regulation.set_audit",
+            args={"ContractIdRaw": contract_id_raw},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def get_regulation_state(self):
+        return self.get_contract_state("core", "regulation", Scope.Global, None)
+
+    @exception_handler
+    def rotation_add_node(self, regulator: DioxAccount, address: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.rotation.add_node",
+            args={"Address": address},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def rotation_remove_node(self, regulator: DioxAccount, address: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.rotation.remove_node",
+            args={"Address": address},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def rotation_report_violation(self, regulator: DioxAccount, miner: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.rotation.report_violation",
+            args={"Miner": miner},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def get_rotation_state(self):
+        return self.get_contract_state("core", "rotation", Scope.Global, None)
+
+    @exception_handler
     def create_token(self,user:DioxAccount,symbol,initial_supply,deposit,decimals,cid=0,minter_flag=1,token_flag=0,sync=True,timeout=DEFAULT_TIMEOUT):
         tx_hash = self.send_transaction(
             user=user,
