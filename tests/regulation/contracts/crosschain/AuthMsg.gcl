@@ -1,0 +1,123 @@
+import IAuthMessage;
+import ISubProtocol;
+import AMLib;
+import Utils;
+
+contract AuthMsg implements IAuthMessage.AuthMessageInterface {
+
+    struct SubProtocol {
+        uint32 protocolType;
+        uint64 protocolID;
+        address protocolAddress;
+        bool exist;
+    }
+
+    @global address owner;
+    @global address relayer;
+
+    @global map<address, SubProtocol> subProtocols;
+    @global map<uint32, address> protocolRoutes;
+    @global map<uint32, uint64> protocolIDs;
+
+    @global AMLib.AuthMessage decodeAuthMsg;
+
+    @global function on_deploy(address _owner, address _relayer) {
+        owner = _owner;
+        relayer = _relayer;
+
+        __debug.print("[on_deploy] AuthMsg deployed - address:", __address(), " id:", __id());
+        __debug.print("[on_deploy] Owner:", owner, " Relayer:", relayer);
+    }
+
+    @address function setRelayer(address _relayer) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_relayer){
+            relayer = _relayer;
+        }
+    }
+
+    @address function setProtocol(uint64 protocolID, address protocolAddress, uint32 protocolType) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        __debug.assert(!subProtocols[protocolAddress].exist);
+
+        relay@global (^protocolID, ^protocolAddress, ^protocolType) {
+            SubProtocol p;
+            p.exist = true;
+            p.protocolType = protocolType;
+            p.protocolID = protocolID;
+            p.protocolAddress = protocolAddress;
+            subProtocols[protocolAddress] = p;
+            protocolRoutes[protocolType] = protocolAddress;
+            protocolIDs[protocolType] = protocolID;
+
+            relay@external SubProtocolUpdate(protocolType, protocolID, protocolAddress);
+            __debug.print("[Event] SubProtocolUpdate - type:", protocolType, " id:", protocolID, " address:", protocolAddress);
+        }
+
+        array<uint8> test;
+        test.push(100u8);
+        test.push(101u8);
+        test.push(102u8);
+        test.push(103u8);
+        test.push(104u8);
+        test.push(1u8);
+        test.push(2u8);
+        test.push(30u8);
+        test.push(40u8);
+        relay@global (^test) {
+            relay@external testEvent(test);
+        }
+    }
+
+    @global function recvFromProtocol(uint64 senderID, array<uint8> message) public export {
+        address protocol = __transaction.get_sender();
+        __debug.assert(subProtocols[protocol].exist);
+
+        // use version 1 for now
+        AMLib.AuthMessage amV1;
+        amV1.version = 1u32;
+        amV1.author = Utils.uint256ToBytes32(uint256(senderID));
+        amV1.protocolType = subProtocols[protocol].protocolType;
+        amV1.body = Utils.bytesCopy(message);
+
+        array<uint8> AMMsg = AMLib.encodeAuthMessage(amV1);
+        __debug.print("[recvFromProtocol] AuthMsg encoded: ", AMMsg);
+        relay@external SendAuthMessage(AMMsg);
+    }
+
+    @address function recvPkgFromRelayer(array<uint8> pkg) public export {
+        __debug.assert(__transaction.get_sender() == relayer);
+
+        __debug.print("[recvPkgFromRelayer] Received UCP package, length: ", pkg.length());
+        __debug.print("[recvPkgFromRelayer] First 20 bytes: ", pkg);
+
+        // 1. 解码 MessageFromRelayer，获取 senderDomain 和 rawResp (AuthMessage bytes)
+        __debug.print("[recvPkgFromRelayer] About to call AMLib.decodeMessageFromRelayer");
+        AMLib.DecodeResult dr = AMLib.decodeMessageFromRelayer(pkg);
+        __debug.print("[recvPkgFromRelayer] AMLib.decodeMessageFromRelayer completed");
+        __debug.print("[recvPkgFromRelayer] senderDomain: ", dr.senderDomain);
+        __debug.print("[recvPkgFromRelayer] rawResp length: ", dr.rawResp.length());
+
+        // 2. 解码 AuthMessage
+        AMLib.AuthMessage msg = AMLib.decodeAuthMessage(dr.rawResp);
+        __debug.print("[recvPkgFromRelayer] Decoded AuthMessage: ", msg);
+
+        relay@global (^msg) {
+            decodeAuthMsg = msg;
+        }
+
+        // 3. 验证协议路由存在
+        address zeroAddress;
+        __debug.assert(protocolRoutes[msg.protocolType] != zeroAddress);
+
+        // 4. 调用上层协议（SDPMsg）的 recvMessage, 触发接收事件
+        relay@global (^msg, ^dr) {
+            uint64 protocolID = protocolIDs[msg.protocolType];
+            ISubProtocol.SubProtocolInterface sdp = ISubProtocol.SubProtocolInterface(protocolID);
+            sdp.recvMessage(dr.senderDomain, msg.author, msg.body);
+
+            relay@external recvAuthMessage(dr.senderDomain, dr.rawResp);
+            __debug.print("[recvPkgFromRelayer] Message routed successfully");
+        }
+    }
+}

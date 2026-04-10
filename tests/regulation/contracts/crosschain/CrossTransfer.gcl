@@ -1,0 +1,68 @@
+import IContractUsingSDP;
+import ISDPMessage;
+
+contract CrossTransfer implements IContractUsingSDP.ContractUsingSDPInterface {
+    @global address owner;
+    @global uint64 sdpContractId;
+    @global address sdpAddress;
+    @address uint32 balance;
+
+    const uint32 FAUCET_AMOUNT = 10000u32;
+
+    @global function on_deploy(address _owner) {
+        owner = _owner;
+        __debug.print("[on_deploy] CrossTransfer APP deployed - address:", __address(), " id:", __id());
+    }
+
+    @address function setProtocol(uint64 _protocolContractId, address _protocolAddress) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_protocolContractId, ^_protocolAddress) {
+            sdpContractId = _protocolContractId;
+            sdpAddress = _protocolAddress;
+            __debug.print("[setProtocol] contractId: ", sdpContractId, " address: ", sdpAddress);
+        }
+    }
+
+    @address function faucet() public export{
+        balance += FAUCET_AMOUNT;
+        __debug.print("[faucet]mint amount ", FAUCET_AMOUNT ," to :", __transaction.get_sender());
+    }
+
+
+    @global function mint(address to, uint32 amount) public export{
+        relay@to (^to,^amount){
+            balance += amount;
+            __debug.print("[Mint] mint amount ", amount," to : ", to);
+        }
+    }
+
+    @global function processMessage(array<uint8> senderDomain, array<uint8> author, array<uint8> message,bool isOrder){
+        uint32 amount = uint32(message[0u32]) | uint32(message[1u32]<<8u8) | uint32(message[2u32]<<16u8) | uint32(message[3u32]<<24u8);
+        mint(__transaction.get_sender(),amount);
+        __debug.print("[Event] recvCrosschainMsg - senderDomain:", senderDomain, " author:", author, " message:", message, " isOrdered:", isOrder);
+    }
+
+    @global function recvUnorderedMessage(array<uint8> senderDomain, array<uint8> author, array<uint8> message) public export{
+        processMessage(senderDomain,author,message,false);
+    }
+
+    @global function recvMessage(array<uint8> senderDomain, array<uint8> author, array<uint8> message) public export{
+        processMessage(senderDomain,author,message,true);
+    }
+
+    @address function crossTransfer(array<uint8> receiverDomain, array<uint8> receiver, uint32 amount) public export {
+        __debug.assert(amount > 0u32);
+        __debug.assert(amount <= balance);
+        ISDPMessage.SDPMessageInterface SDPMsg = ISDPMessage.SDPMessageInterface(sdpContractId);
+        balance -= amount;
+        __debug.print("[Burn] Burn amount", amount," from : ", __transaction.get_sender());
+        uint64 senderId = uint64(__id());
+        array<uint8> message;
+        message.push(uint8(amount&0xffu32));
+        message.push(uint8((amount>>8u32)&0xffu32));
+        message.push(uint8((amount>>16u32)&0xffu32));
+        message.push(uint8((amount>>24u32)&0xffu32));
+        SDPMsg.sendUnorderedMessage(receiverDomain, receiver, message, senderId);
+        __debug.print("[Event] sendCrosschainMsg - receiverDomain:", receiverDomain, " receiver:", receiver, " message:", message, " isOrdered:", false);
+    }
+}

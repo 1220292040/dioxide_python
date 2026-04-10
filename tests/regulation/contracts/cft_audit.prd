@@ -1,0 +1,21 @@
+import AuditInterface as iface;
+
+contract CftAudit implements iface.IAuditCheck
+{
+	@global map<address, bool> sanctions;
+
+	@global function bool check(iface.AuditContext ctx) public export
+	{
+		return !(sanctions.has(ctx.sender) && sanctions[ctx.sender]);
+	}
+
+	@address function add_sanction(address addr) public export
+	{
+		relay@global(^addr) { sanctions[addr] = true; }
+	}
+
+	@address function remove_sanction(address addr) public export
+	{
+		relay@global(^addr) { sanctions.erase(addr); }
+	}
+}
