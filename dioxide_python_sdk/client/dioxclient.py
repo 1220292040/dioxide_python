@@ -889,6 +889,63 @@ class DioxClient:
     def get_rotation_state(self):
         return self.get_contract_state("core", "rotation", Scope.Global, None)
 
+    # AuditProxy management (user-deployed DApp contract) ---------------------
+    # Compliance impl contracts must implement IAuditCheck.check(AuditContext) -> bool.
+    # AuditProxy asserts on the bool result; false causes the entire audit tx to fail.
+    @exception_handler
+    def audit_proxy_register(self, dapp_name: str, owner: DioxAccount, check_name: str, impl_cid: int, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=owner,
+            function=f"{dapp_name}.AuditProxy.register",
+            args={"check_name": check_name, "impl_cid": impl_cid},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def audit_proxy_unregister(self, dapp_name: str, owner: DioxAccount, check_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=owner,
+            function=f"{dapp_name}.AuditProxy.unregister",
+            args={"check_name": check_name},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def audit_proxy_bind(self, dapp_name: str, owner: DioxAccount, app_cvid: int, audit_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=owner,
+            function=f"{dapp_name}.AuditProxy.bind",
+            args={"app_cvid": app_cvid, "audit_name": audit_name},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def audit_proxy_unbind(self, dapp_name: str, owner: DioxAccount, app_cvid: int, audit_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=owner,
+            function=f"{dapp_name}.AuditProxy.unbind",
+            args={"app_cvid": app_cvid, "audit_name": audit_name},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def audit_proxy_query_bindings(self, dapp_name: str, owner: DioxAccount, check_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=owner,
+            function=f"{dapp_name}.AuditProxy.query_bindings",
+            args={"check_name": check_name},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def get_audit_proxy_state(self, dapp_name: str):
+        return self.get_contract_state(dapp_name, "AuditProxy", Scope.Global, None)
+
     @exception_handler
     def create_token(self,user:DioxAccount,symbol,initial_supply,deposit,decimals,cid=0,minter_flag=1,token_flag=0,sync=True,timeout=DEFAULT_TIMEOUT):
         tx_hash = self.send_transaction(
