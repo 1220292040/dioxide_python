@@ -30,6 +30,7 @@ from box import Box  # type: ignore
 from . import types as dioxtypes
 import queue
 import base64
+import hashlib
 import time
 import json
 from ..client.contract import Scope
@@ -38,6 +39,10 @@ import threading
 import websockets  # type: ignore
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
+try:
+    import krock32  # type: ignore
+except ImportError:
+    krock32 = None
 
 
 DEFAULT_TIMEOUT = 60
@@ -632,7 +637,11 @@ class DioxClient:
     @exception_handler
     def get_contract_state(self,dapp_name,contract_name,scope:Scope,key):
         method = "dx.contract_state"
-        params = {"contract_with_scope":str(dapp_name)+"."+str(contract_name)+"."+scope.name.lower()}
+        contract_ref = str(dapp_name)+"."+str(contract_name)
+        if "." in str(contract_name):
+            contract_info = self.get_contract_info(dapp_name, contract_name)
+            contract_ref = str(contract_info.ContractVersionID)
+        params = {"contract_with_scope":contract_ref+"."+scope.name.lower()}
         if scope.value != scope.Global.value:
             params.update({"scope_key":key})
         response = self.make_request(method,params)
@@ -859,7 +868,7 @@ class DioxClient:
     def rotation_add_node(self, regulator: DioxAccount, address: str, sync=True, timeout=DEFAULT_TIMEOUT):
         return self.send_transaction(
             user=regulator,
-            function="core.rotation.add_node",
+            function="core.rotation.address.add_node",
             args={"Address": address},
             is_sync=sync,
             timeout=timeout
@@ -869,7 +878,7 @@ class DioxClient:
     def rotation_remove_node(self, regulator: DioxAccount, address: str, sync=True, timeout=DEFAULT_TIMEOUT):
         return self.send_transaction(
             user=regulator,
-            function="core.rotation.remove_node",
+            function="core.rotation.address.remove_node",
             args={"Address": address},
             is_sync=sync,
             timeout=timeout
@@ -879,7 +888,7 @@ class DioxClient:
     def rotation_report_violation(self, regulator: DioxAccount, miner: str, sync=True, timeout=DEFAULT_TIMEOUT):
         return self.send_transaction(
             user=regulator,
-            function="core.rotation.report_violation",
+            function="core.rotation.address.report_violation",
             args={"Miner": miner},
             is_sync=sync,
             timeout=timeout
@@ -889,62 +898,99 @@ class DioxClient:
     def get_rotation_state(self):
         return self.get_contract_state("core", "rotation", Scope.Global, None)
 
-    # AuditProxy management (regulator-gated system contract) ---------------------
-    # Compliance impl contracts must implement IAuditCheck.check(AuditContext) -> bool.
-    # AuditProxy asserts on the bool result; false causes the entire audit tx to fail.
+    # Regulation-managed AuditProxy administration -------------------------------
+    def _normalize_preda_hash(self, value: str):
+        if not isinstance(value, str):
+            return value
+
+        lowered = value.lower()
+        if len(lowered) == 64 and all(c in "0123456789abcdef" for c in lowered):
+            return lowered
+
+        crockford_alphabet = "0123456789abcdefghjkmnpqrstvwxyz"
+        if len(lowered) == 52 and all(c in crockford_alphabet for c in lowered):
+            return lowered
+
+        digest = hashlib.sha256(value.encode("utf-8")).digest()
+        if krock32 is not None:
+            encoder = krock32.Encoder()
+            encoder.update(digest)
+            return encoder.finalize().lower()
+        return digest.hex()
+
     @exception_handler
-    def audit_proxy_register(self, dapp_name: str, regulator: DioxAccount, check_name: str, impl_cid: int, sync=True, timeout=DEFAULT_TIMEOUT):
+    def regulation_register_audit_impl(self, regulator: DioxAccount, check_name: str, impl_cid: int, sync=True, timeout=DEFAULT_TIMEOUT):
+        normalized_check_name = self._normalize_preda_hash(check_name)
         return self.send_transaction(
             user=regulator,
-            function=f"{dapp_name}.AuditProxy.register",
-            args={"check_name": check_name, "impl_cid": impl_cid},
+            function="core.regulation.register_audit_impl",
+            args={"check_name": normalized_check_name, "impl_cid": impl_cid},
             is_sync=sync,
             timeout=timeout
         )
 
     @exception_handler
-    def audit_proxy_unregister(self, dapp_name: str, regulator: DioxAccount, check_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
+    def regulation_unregister_audit_impl(self, regulator: DioxAccount, check_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        normalized_check_name = self._normalize_preda_hash(check_name)
         return self.send_transaction(
             user=regulator,
-            function=f"{dapp_name}.AuditProxy.unregister",
-            args={"check_name": check_name},
+            function="core.regulation.unregister_audit_impl",
+            args={"check_name": normalized_check_name},
             is_sync=sync,
             timeout=timeout
         )
 
     @exception_handler
-    def audit_proxy_bind(self, dapp_name: str, regulator: DioxAccount, app_cvid: int, audit_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
+    def regulation_bind_audit(self, regulator: DioxAccount, app_cid: int, audit_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        normalized_audit_name = self._normalize_preda_hash(audit_name)
         return self.send_transaction(
             user=regulator,
-            function=f"{dapp_name}.AuditProxy.bind",
-            args={"app_cvid": app_cvid, "audit_name": audit_name},
+            function="core.regulation.bind_audit",
+            args={"app_cid": app_cid, "audit_name": normalized_audit_name},
             is_sync=sync,
             timeout=timeout
         )
 
     @exception_handler
-    def audit_proxy_unbind(self, dapp_name: str, regulator: DioxAccount, app_cvid: int, audit_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
+    def regulation_unbind_audit(self, regulator: DioxAccount, app_cid: int, audit_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        normalized_audit_name = self._normalize_preda_hash(audit_name)
         return self.send_transaction(
             user=regulator,
-            function=f"{dapp_name}.AuditProxy.unbind",
-            args={"app_cvid": app_cvid, "audit_name": audit_name},
+            function="core.regulation.unbind_audit",
+            args={"app_cid": app_cid, "audit_name": normalized_audit_name},
             is_sync=sync,
             timeout=timeout
         )
 
     @exception_handler
-    def audit_proxy_query_bindings(self, dapp_name: str, regulator: DioxAccount, check_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
-        return self.send_transaction(
-            user=regulator,
-            function=f"{dapp_name}.AuditProxy.query_bindings",
-            args={"check_name": check_name},
-            is_sync=sync,
-            timeout=timeout
-        )
+    def regulation_query_audit_bindings(self, check_name: str):
+        normalized_check_name = self._normalize_preda_hash(check_name)
+        state = self.get_contract_state("core", "regulation.audit_bindings", Scope.Global, None)
+        if state is None:
+            return []
 
-    @exception_handler
-    def get_audit_proxy_state(self, dapp_name: str):
-        return self.get_contract_state(dapp_name, "AuditProxy", Scope.Global, None)
+        bindings = state.get("State", {}) if isinstance(state, dict) else getattr(state, "State", {})
+        if not isinstance(bindings, dict):
+            return []
+
+        lookup_keys = [normalized_check_name, str(normalized_check_name), check_name, str(check_name)]
+        values = None
+        for lookup_key in lookup_keys:
+            values = bindings.get(lookup_key, None)
+            if values is not None:
+                break
+        if values is None:
+            for nested in bindings.values():
+                if isinstance(nested, dict):
+                    for lookup_key in lookup_keys:
+                        values = nested.get(lookup_key, None)
+                        if values is not None:
+                            break
+                    if values is not None:
+                        break
+        if values is None:
+            values = []
+        return [int(v) for v in values]
 
     @exception_handler
     def create_token(self,user:DioxAccount,symbol,initial_supply,deposit,decimals,cid=0,minter_flag=1,token_flag=0,sync=True,timeout=DEFAULT_TIMEOUT):

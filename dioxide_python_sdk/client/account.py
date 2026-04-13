@@ -1,5 +1,5 @@
 import base64
-import ed25519
+from .. import ed25519_compat as ed25519
 import krock32.decode
 import crc32c # type: ignore
 import krock32
