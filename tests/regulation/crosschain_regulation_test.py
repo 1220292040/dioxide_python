@@ -1,8 +1,10 @@
 """End-to-end test: cross-chain contract regulation via AuditProxy.
 
-Deploys PREDA audit contracts (AuditInterface, KycAudit, CftAudit, AuditProxy)
-and GCL cross-chain contracts (CrossTransfer, AppContract), then verifies that
-AuditProxy correctly regulates function calls on real user-deployed contracts.
+Reuses the system-predeployed ``core.AuditProxy``, deploys PREDA audit
+implementations (KycAudit, CftAudit) that import ``core.AuditInterface``
+directly, and GCL cross-chain
+contracts (CrossTransfer, AppContract), then verifies that AuditProxy correctly
+regulates function calls on real user-deployed contracts.
 
 Test matrix:
   - IT-CC1: KYC audit on AppContract
@@ -22,8 +24,13 @@ import pytest
 from dioxide_python_sdk.client.dioxclient import DioxClient, DioxError
 from dioxide_python_sdk.client.account import DioxAccount
 
-CONTRACTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "contracts")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONTRACTS_DIR = os.path.join(BASE_DIR, "contracts")
 CROSSCHAIN_DIR = os.path.join(CONTRACTS_DIR, "crosschain")
+REG_CONTRACTS_DIR = os.path.abspath(
+    os.path.join(BASE_DIR, "..", "..", "..", "oxd_bc", "rvm_contracts")
+)
+CORE_AUDIT_DAPP = "core"
 
 _SUFFIX = uuid.uuid4().hex[:4]
 AUDIT_DAPP = f"RA{_SUFFIX}"
@@ -133,22 +140,22 @@ def user_plain(client):
 
 @pytest.fixture(scope="module")
 def audit_dapp(client, deployer):
-    """Deploy audit DApp: AuditInterface + KycAudit + CftAudit + AuditProxy."""
+    """Deploy audit implementations and reuse the predeployed core AuditProxy."""
     _, ok = client.create_dapp(deployer, AUDIT_DAPP, 10**12)
     assert ok, f"Failed to create audit dapp {AUDIT_DAPP}"
 
     contracts = {
-        os.path.join(CONTRACTS_DIR, "audit_interface.prd"): None,
-        os.path.join(CONTRACTS_DIR, "kyc_audit.prd"): None,
-        os.path.join(CONTRACTS_DIR, "cft_audit.prd"): None,
-        os.path.join(CONTRACTS_DIR, "audit_proxy.prd"): {"addr": deployer.address},
+        os.path.join(REG_CONTRACTS_DIR, "kyc_audit.prd"): None,
+        os.path.join(REG_CONTRACTS_DIR, "cft_audit.prd"): None,
     }
     tx = client.deploy_contracts(AUDIT_DAPP, deployer, contracts, compile_time=20)
     assert tx is not None, "Audit contracts deploy failed"
 
-    proxy_info = client.get_contract_info(AUDIT_DAPP, "AuditProxy")
+    proxy_info = client.get_contract_info(CORE_AUDIT_DAPP, "AuditProxy")
     kyc_info = client.get_contract_info(AUDIT_DAPP, "KycAudit")
     cft_info = client.get_contract_info(AUDIT_DAPP, "CftAudit")
+    regulation_state = client.get_regulation_state()
+    assert int(regulation_state.State.AuditContractIdRaw) == int(proxy_info.ContractID)
 
     return {
         "proxy_cid": proxy_info.ContractID,
@@ -230,22 +237,15 @@ def cc_dapp(client, deployer):
 def env(client, deployer, regulator,
         user_approved, user_blocked, user_cft_kyc, user_plain,
         audit_dapp, cc_dapp):
-    """Wire up regulation: set chain audit, register, bind, approve/sanction."""
+    """Wire up regulation: register, bind, approve and sanction."""
     proxy_cid = audit_dapp["proxy_cid"]
     kyc_cvid = audit_dapp["kyc_cvid"]
     cft_cvid = audit_dapp["cft_cvid"]
     ct_bind_id = cc_dapp["ct_cid"]
     app_bind_id = cc_dapp["app_cid"]
 
-    tx = client.regulation_set_audit(regulator, proxy_cid, sync=True)
-    assert tx is not None, "regulation_set_audit tx failed"
-    tx_detail = client.get_transaction(tx)
-    relays = client.get_all_relay_transactions(tx_detail, detail=True)
-    for r in relays:
-        assert r.Invocation.Status == "IVKRET_SUCCESS", \
-            f"regulation_set_audit relay failed: {r.Invocation.Status}"
-
-    time.sleep(2)
+    regulation_state = client.get_regulation_state()
+    assert int(regulation_state.State.AuditContractIdRaw) == int(proxy_cid)
 
     kyc_hash = _preda_hash("kyc")
     cft_hash = _preda_hash("cft")
@@ -259,19 +259,19 @@ def env(client, deployer, regulator,
                 assert r.Invocation.Status == "IVKRET_SUCCESS", \
                     f"{label} relay failed: {r.Invocation.Status}"
 
-    tx = client.audit_proxy_register(AUDIT_DAPP, deployer, kyc_hash, kyc_cvid, sync=True)
+    tx = client.audit_proxy_register(CORE_AUDIT_DAPP, regulator, kyc_hash, kyc_cvid, sync=True)
     assert tx is not None, "audit_proxy_register kyc tx returned None"
     _assert_relay_success(tx, "register(kyc)")
 
-    tx = client.audit_proxy_register(AUDIT_DAPP, deployer, cft_hash, cft_cvid, sync=True)
+    tx = client.audit_proxy_register(CORE_AUDIT_DAPP, regulator, cft_hash, cft_cvid, sync=True)
     assert tx is not None, "audit_proxy_register cft tx returned None"
     _assert_relay_success(tx, "register(cft)")
 
-    tx = client.audit_proxy_bind(AUDIT_DAPP, deployer, ct_bind_id, cft_hash, sync=True)
+    tx = client.audit_proxy_bind(CORE_AUDIT_DAPP, regulator, ct_bind_id, cft_hash, sync=True)
     assert tx is not None, "audit_proxy_bind cft->ct tx returned None"
     _assert_relay_success(tx, "bind(cft->ct)")
 
-    tx = client.audit_proxy_bind(AUDIT_DAPP, deployer, app_bind_id, kyc_hash, sync=True)
+    tx = client.audit_proxy_bind(CORE_AUDIT_DAPP, regulator, app_bind_id, kyc_hash, sync=True)
     assert tx is not None, "audit_proxy_bind kyc->app tx returned None"
     _assert_relay_success(tx, "bind(kyc->app)")
 
@@ -388,9 +388,9 @@ class TestCC4BindingIsolation:
 class TestCC3UnbindRestoresAccess:
 
     def test_unbind_cft_allows_sanctioned_user(
-            self, client, deployer, user_blocked, env):
+            self, client, regulator, user_blocked, env):
         client.audit_proxy_unbind(
-            AUDIT_DAPP, deployer, env["ct_bind_id"], _preda_hash("cft"), sync=True)
+            CORE_AUDIT_DAPP, regulator, env["ct_bind_id"], _preda_hash("cft"), sync=True)
         _, ok = _send_tx(
             client, user_blocked,
             f"{CC_DAPP}.CrossTransfer.faucet", {})
@@ -399,9 +399,9 @@ class TestCC3UnbindRestoresAccess:
             "on CrossTransfer")
 
     def test_unbind_kyc_allows_unapproved_user(
-            self, client, deployer, user_blocked, env):
+            self, client, regulator, user_blocked, env):
         client.audit_proxy_unbind(
-            AUDIT_DAPP, deployer, env["app_bind_id"], _preda_hash("kyc"), sync=True)
+            CORE_AUDIT_DAPP, regulator, env["app_bind_id"], _preda_hash("kyc"), sync=True)
         _, ok = _send_tx(
             client, user_blocked,
             f"{CC_DAPP}.AppContract.sendUnorderedMessage",
