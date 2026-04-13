@@ -1,9 +1,11 @@
-"""End-to-end test: cross-chain contract regulation via AuditProxy.
+"""End-to-end test: cross-chain contract regulation via core.regulation.
 
-Reuses the system-predeployed ``core.AuditProxy``, deploys PREDA audit
+Reuses the system-predeployed ``core.AuditProxy`` behind the builtin
+``core.regulation`` entrypoints, deploys PREDA audit
 implementations (KycAudit, CftAudit) that import ``core.AuditInterface``
 directly, and GCL cross-chain
-contracts (CrossTransfer, AppContract), then verifies that AuditProxy correctly
+contracts (CrossTransfer, AppContract), then verifies that the regulation-managed
+AuditProxy correctly
 regulates function calls on real user-deployed contracts.
 
 Test matrix:
@@ -15,11 +17,14 @@ Test matrix:
 
 import hashlib
 import os
+import sys
 import uuid
 import time
 
 import krock32
 import pytest
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from dioxide_python_sdk.client.dioxclient import DioxClient, DioxError
 from dioxide_python_sdk.client.account import DioxAccount
@@ -229,7 +234,6 @@ def cc_dapp(client, deployer):
         "ct_cid": ct_info.ContractID,
         "ct_cvid": ct_info.ContractVersionID,
         "app_cid": app_info.ContractID,
-        "app_cvid": app_info.ContractVersionID,
     }
 
 
@@ -259,20 +263,20 @@ def env(client, deployer, regulator,
                 assert r.Invocation.Status == "IVKRET_SUCCESS", \
                     f"{label} relay failed: {r.Invocation.Status}"
 
-    tx = client.audit_proxy_register(CORE_AUDIT_DAPP, regulator, kyc_hash, kyc_cvid, sync=True)
-    assert tx is not None, "audit_proxy_register kyc tx returned None"
+    tx = client.regulation_register_audit_impl(regulator, kyc_hash, kyc_cvid, sync=True)
+    assert tx is not None, "regulation_register_audit_impl kyc tx returned None"
     _assert_relay_success(tx, "register(kyc)")
 
-    tx = client.audit_proxy_register(CORE_AUDIT_DAPP, regulator, cft_hash, cft_cvid, sync=True)
-    assert tx is not None, "audit_proxy_register cft tx returned None"
+    tx = client.regulation_register_audit_impl(regulator, cft_hash, cft_cvid, sync=True)
+    assert tx is not None, "regulation_register_audit_impl cft tx returned None"
     _assert_relay_success(tx, "register(cft)")
 
-    tx = client.audit_proxy_bind(CORE_AUDIT_DAPP, regulator, ct_bind_id, cft_hash, sync=True)
-    assert tx is not None, "audit_proxy_bind cft->ct tx returned None"
+    tx = client.regulation_bind_audit(regulator, ct_bind_id, cft_hash, sync=True)
+    assert tx is not None, "regulation_bind_audit cft->ct tx returned None"
     _assert_relay_success(tx, "bind(cft->ct)")
 
-    tx = client.audit_proxy_bind(CORE_AUDIT_DAPP, regulator, app_bind_id, kyc_hash, sync=True)
-    assert tx is not None, "audit_proxy_bind kyc->app tx returned None"
+    tx = client.regulation_bind_audit(regulator, app_bind_id, kyc_hash, sync=True)
+    assert tx is not None, "regulation_bind_audit kyc->app tx returned None"
     _assert_relay_success(tx, "bind(kyc->app)")
 
     tx = client.send_transaction(
@@ -389,8 +393,8 @@ class TestCC3UnbindRestoresAccess:
 
     def test_unbind_cft_allows_sanctioned_user(
             self, client, regulator, user_blocked, env):
-        client.audit_proxy_unbind(
-            CORE_AUDIT_DAPP, regulator, env["ct_bind_id"], _preda_hash("cft"), sync=True)
+        client.regulation_unbind_audit(
+            regulator, env["ct_bind_id"], _preda_hash("cft"), sync=True)
         _, ok = _send_tx(
             client, user_blocked,
             f"{CC_DAPP}.CrossTransfer.faucet", {})
@@ -400,8 +404,8 @@ class TestCC3UnbindRestoresAccess:
 
     def test_unbind_kyc_allows_unapproved_user(
             self, client, regulator, user_blocked, env):
-        client.audit_proxy_unbind(
-            CORE_AUDIT_DAPP, regulator, env["app_bind_id"], _preda_hash("kyc"), sync=True)
+        client.regulation_unbind_audit(
+            regulator, env["app_bind_id"], _preda_hash("kyc"), sync=True)
         _, ok = _send_tx(
             client, user_blocked,
             f"{CC_DAPP}.AppContract.sendUnorderedMessage",

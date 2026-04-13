@@ -122,20 +122,9 @@ class TestRotationNodes:
         assert isinstance(tx_hash, str)
 
 
-AUDIT_DAPP_NAME = "core"
-
-
-class TestAuditProxy:
-    """AuditProxy management API tests.
-
-    These tests only verify that the SDK methods correctly compose and
-    send transactions. They require a running node with the system
-    AuditProxy already deployed under AUDIT_DAPP_NAME.
-    """
-
-    def test_audit_proxy_register(self, client, regulator):
-        tx_hash = client.audit_proxy_register(
-            dapp_name=AUDIT_DAPP_NAME,
+class TestRegulationAuditProxy:
+    def test_regulation_register_audit_impl(self, client, regulator):
+        tx_hash = client.regulation_register_audit_impl(
             regulator=regulator,
             check_name="kyc",
             impl_cid=0,
@@ -144,48 +133,36 @@ class TestAuditProxy:
         assert tx_hash is not None
         assert isinstance(tx_hash, str)
 
-    def test_audit_proxy_bind(self, client, regulator):
-        tx_hash = client.audit_proxy_bind(
-            dapp_name=AUDIT_DAPP_NAME,
+    def test_regulation_bind_audit(self, client, regulator):
+        tx_hash = client.regulation_bind_audit(
             regulator=regulator,
-            app_cvid=0,
+            app_cid=0,
             audit_name="kyc",
             sync=True
         )
         assert tx_hash is not None
         assert isinstance(tx_hash, str)
 
-    def test_audit_proxy_query_bindings(self, client, regulator):
-        tx_hash = client.audit_proxy_query_bindings(
-            dapp_name=AUDIT_DAPP_NAME,
-            regulator=regulator,
-            check_name="kyc",
-            sync=True
-        )
-        assert tx_hash is not None
-        assert isinstance(tx_hash, str)
+    def test_regulation_query_audit_bindings(self, client):
+        bindings = client.regulation_query_audit_bindings(check_name="kyc")
+        assert bindings is not None
+        assert isinstance(bindings, list)
 
-    def test_audit_proxy_unbind(self, client, regulator):
-        tx_hash = client.audit_proxy_unbind(
-            dapp_name=AUDIT_DAPP_NAME,
+    def test_regulation_unbind_audit(self, client, regulator):
+        tx_hash = client.regulation_unbind_audit(
             regulator=regulator,
-            app_cvid=0,
+            app_cid=0,
             audit_name="kyc",
             sync=True
         )
         assert tx_hash is not None
         assert isinstance(tx_hash, str)
 
-    def test_audit_proxy_unregister(self, client, regulator):
-        tx_hash = client.audit_proxy_unregister(
-            dapp_name=AUDIT_DAPP_NAME,
+    def test_regulation_unregister_audit_impl(self, client, regulator):
+        tx_hash = client.regulation_unregister_audit_impl(
             regulator=regulator,
             check_name="kyc",
             sync=True
         )
         assert tx_hash is not None
         assert isinstance(tx_hash, str)
-
-    def test_get_audit_proxy_state(self, client):
-        state = client.get_audit_proxy_state(dapp_name=AUDIT_DAPP_NAME)
-        assert state is not None
