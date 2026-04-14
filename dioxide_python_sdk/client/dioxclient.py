@@ -918,47 +918,70 @@ class DioxClient:
             return encoder.finalize().lower()
         return digest.hex()
 
+    def _normalize_regulation_audit_proxy_args(self, function_name: str, args):
+        if isinstance(args, str):
+            return args
+
+        normalized_args = dict(args or {})
+        if function_name in ("core.AuditProxy.register", "core.AuditProxy.unregister"):
+            if "check_name" in normalized_args:
+                normalized_args["check_name"] = self._normalize_preda_hash(normalized_args["check_name"])
+        elif function_name in ("core.AuditProxy.bind", "core.AuditProxy.unbind"):
+            if "audit_name" in normalized_args:
+                normalized_args["audit_name"] = self._normalize_preda_hash(normalized_args["audit_name"])
+
+        return json.dumps(normalized_args, separators=(",", ":"))
+
     @exception_handler
-    def regulation_register_audit_impl(self, regulator: DioxAccount, check_name: str, impl_cid: int, sync=True, timeout=DEFAULT_TIMEOUT):
-        normalized_check_name = self._normalize_preda_hash(check_name)
+    def regulation_call_audit_proxy(self, regulator: DioxAccount, function_name: str, args, sync=True, timeout=DEFAULT_TIMEOUT):
         return self.send_transaction(
             user=regulator,
-            function="core.regulation.register_audit_impl",
-            args={"check_name": normalized_check_name, "impl_cid": impl_cid},
+            function="core.regulation.call_audit_proxy",
+            args={
+                "function_name": function_name,
+                "args_json": self._normalize_regulation_audit_proxy_args(function_name, args),
+            },
             is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def regulation_register_audit_impl(self, regulator: DioxAccount, check_name: str, impl_cid: int, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.regulation_call_audit_proxy(
+            regulator=regulator,
+            function_name="core.AuditProxy.register",
+            args={"check_name": check_name, "impl_cid": impl_cid},
+            sync=sync,
             timeout=timeout
         )
 
     @exception_handler
     def regulation_unregister_audit_impl(self, regulator: DioxAccount, check_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
-        normalized_check_name = self._normalize_preda_hash(check_name)
-        return self.send_transaction(
-            user=regulator,
-            function="core.regulation.unregister_audit_impl",
-            args={"check_name": normalized_check_name},
-            is_sync=sync,
+        return self.regulation_call_audit_proxy(
+            regulator=regulator,
+            function_name="core.AuditProxy.unregister",
+            args={"check_name": check_name},
+            sync=sync,
             timeout=timeout
         )
 
     @exception_handler
     def regulation_bind_audit(self, regulator: DioxAccount, app_cid: int, audit_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
-        normalized_audit_name = self._normalize_preda_hash(audit_name)
-        return self.send_transaction(
-            user=regulator,
-            function="core.regulation.bind_audit",
-            args={"app_cid": app_cid, "audit_name": normalized_audit_name},
-            is_sync=sync,
+        return self.regulation_call_audit_proxy(
+            regulator=regulator,
+            function_name="core.AuditProxy.bind",
+            args={"app_cid": app_cid, "audit_name": audit_name},
+            sync=sync,
             timeout=timeout
         )
 
     @exception_handler
     def regulation_unbind_audit(self, regulator: DioxAccount, app_cid: int, audit_name: str, sync=True, timeout=DEFAULT_TIMEOUT):
-        normalized_audit_name = self._normalize_preda_hash(audit_name)
-        return self.send_transaction(
-            user=regulator,
-            function="core.regulation.unbind_audit",
-            args={"app_cid": app_cid, "audit_name": normalized_audit_name},
-            is_sync=sync,
+        return self.regulation_call_audit_proxy(
+            regulator=regulator,
+            function_name="core.AuditProxy.unbind",
+            args={"app_cid": app_cid, "audit_name": audit_name},
+            sync=sync,
             timeout=timeout
         )
 
