@@ -55,11 +55,15 @@ for d in ["ab","abcd","abcdefgha"]:
 msg = "helloworld".encode()
 sig = account0.sign(msg)
 print(sig)
+assert sig is not None
+assert len(sig) == 64
 
 print(account0.verify(sig,msg))
+assert account0.verify(sig,msg) is True
 
 msg = "helloworl".encode()
 print(account0.verify(sig,msg))
+assert account0.verify(sig,msg) is False
 
 key = "cqt3xyv2zb4fzwbdy8wn94akxavxk1srdvb69x8a42xsn34k1fes700f60:ed25519".encode()
 addr = DioxAddress.from_key(key.decode())
@@ -79,9 +83,33 @@ if account_sm2:
     print("SM2 Private Key Length:", len(account_sm2.sk_bytes))
     print("SM2 Public Key Length:", len(account_sm2.pk_bytes))
     print("SM2 Is Valid:", account_sm2.is_valid())
+    assert account_sm2.account_type.name == "SM2"
+    assert account_sm2.is_valid() is True
+
+    sm2_msg = b"hello-sm2"
+    sm2_sig = account_sm2.sign(sm2_msg)
+    print("SM2 Signature Length:", len(sm2_sig) if sm2_sig else None)
+    assert sm2_sig is not None
+    assert len(sm2_sig) == 64
+    assert account_sm2.verify(sm2_sig, sm2_msg) is True
+    assert account_sm2.verify(sm2_sig, b"hello-sm2-bad") is False
+
+    txdata = b"\x01\x02payload"
+    signed_tx = account_sm2.sign_diox_transaction(txdata)
+    print("SM2 Signed Tx Length:", len(signed_tx) if signed_tx else None)
+    assert signed_tx is not None
+    sid = account_sm2.account_type.value.to_bytes(1, byteorder="little")
+    header = txdata + sid + account_sm2.pk_bytes
+    assert signed_tx.startswith(header)
+    tx_sig = signed_tx[len(header):len(header)+64]
+    assert len(tx_sig) == 64
+    assert account_sm2.verify(tx_sig, header) is True
+    pow_part = signed_tx[len(header)+64:]
+    assert len(pow_part) % 4 == 0
 
 sm2_key = "zqgx8f30g04qpd2fxxm9e05een3ytjp970vzbjnhctjrf7kj5per84cj34:sm2"
 sm2_addr = DioxAddress.from_key(sm2_key)
 print("SM2 Address from_key:", sm2_addr)
 if account_sm2:
     print("SM2 Address comparison:", sm2_addr == account_sm2.address if sm2_addr else False)
+    assert sm2_addr == account_sm2.address
