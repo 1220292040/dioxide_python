@@ -748,21 +748,7 @@ class DioxClient:
 
     #wrapper method ----------------------------------------------------------------
     @exception_handler
-    def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,delegatee=None,gas_price=None,gas_limit=None,is_sync=False,timeout=DEFAULT_TIMEOUT,use_node_signing=None):
-        if use_node_signing is None:
-            use_node_signing = user.account_type == DioxAccountType.SM2
-
-        if use_node_signing:
-            if delegatee is not None or is_delegatee or tokens is not None or isn is not None or gas_price is not None or gas_limit is not None:
-                raise DioxError(-10005, "use_node_signing only supports function and args")
-            return self.send_transaction_with_sk(
-                private_key=user.sk_b64,
-                function=function,
-                args=args,
-                sync=is_sync,
-                timeout=timeout,
-            )
-
+    def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,delegatee=None,gas_price=None,gas_limit=None,is_sync=False,timeout=DEFAULT_TIMEOUT):
         sender_addr = user.address
         if ":" not in sender_addr:
             sender_addr = sender_addr + ":" + user.account_type.name.lower()
@@ -785,8 +771,10 @@ class DioxClient:
                                           gas_limit=gas_limit
                                         )
         signed_txn = user.sign_diox_transaction(unsigned_txn)
-        tx_hash = self.send_raw_transaction(signed_txn,is_sync,timeout)
-        return tx_hash
+        if signed_txn is None:
+            raise DioxError(-10006, "failed to sign transaction")
+
+        return self.send_raw_transaction(signed_txn,is_sync,timeout)
 
     @exception_handler
     def send_transaction_with_sk(self, private_key: str, function: str, args: dict, sync=False, timeout=DEFAULT_TIMEOUT):
@@ -805,34 +793,55 @@ class DioxClient:
         return tx_hash
 
     @exception_handler
-    def mint_dio(self,user:DioxAccount,amount,sync=True,timeout=DEFAULT_TIMEOUT,use_node_signing=None):
-        tx_hash = self.send_transaction(
+    def mint_dio(self,user:DioxAccount,amount,sync=True,timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
             user=user,
             function="core.coin.mint",
             args={"Amount":"{}".format(amount)},
             is_sync=sync,
             timeout=timeout,
-            use_node_signing=use_node_signing,
         )
-        return tx_hash
 
     @exception_handler
-    def transfer(self,sender:DioxAccount,receiver,amount,token="DIO",delegatee=None,sync=True,timeout=DEFAULT_TIMEOUT,use_node_signing=None):
+    def mint_dio_with_sk(self,user:DioxAccount,amount,sync=True,timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction_with_sk(
+            private_key=user.sk_b64,
+            function="core.coin.mint",
+            args={"Amount":"{}".format(amount)},
+            sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def transfer(self,sender:DioxAccount,receiver,amount,token="DIO",delegatee=None,sync=True,timeout=DEFAULT_TIMEOUT):
         args = {
             "To":"{}".format(receiver),
             "Amount":"{}".format(amount),
             "TokenId":"{}".format(token)
         }
-        tx_hash = self.send_transaction(
+        return self.send_transaction(
             user=sender,
             function="core.wallet.transfer",
             args=args,
             delegatee=delegatee,
             is_sync=sync,
             timeout=timeout,
-            use_node_signing=use_node_signing,
         )
-        return tx_hash
+
+    @exception_handler
+    def transfer_with_sk(self,sender:DioxAccount,receiver,amount,token="DIO",sync=True,timeout=DEFAULT_TIMEOUT):
+        args = {
+            "To":"{}".format(receiver),
+            "Amount":"{}".format(amount),
+            "TokenId":"{}".format(token)
+        }
+        return self.send_transaction_with_sk(
+            private_key=sender.sk_b64,
+            function="core.wallet.transfer",
+            args=args,
+            sync=sync,
+            timeout=timeout,
+        )
 
     @exception_handler
     def create_dapp(self,user:DioxAccount,dapp_name,deposit_amount,sync=True,timeout=DEFAULT_TIMEOUT):

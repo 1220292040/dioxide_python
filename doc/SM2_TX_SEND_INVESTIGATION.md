@@ -19,15 +19,17 @@ This means the SDK is currently usable for SM2 accounts only by routing through 
 
 ## Current User-Facing Status
 
-To keep the SDK usable, `SM2` accounts now default to node-side signing:
+The SDK now keeps the two transaction submission styles separate:
 
-- `DioxClient.send_transaction(..., use_node_signing=None)` auto-selects `tx.send_withSK` for `SM2`
-- `DioxClient.mint_dio(..., use_node_signing=None)` auto-selects `tx.send_withSK` for `SM2`
-- `DioxClient.transfer(..., use_node_signing=None)` auto-selects `tx.send_withSK` for `SM2`
+- `DioxClient.send_transaction(...)` uses the local compose/sign/send path only
+- `DioxClient.send_transaction_with_sk(...)` uses `tx.send_withSK`
+- `DioxClient.mint_dio(...)` / `DioxClient.transfer(...)` are local-signing helpers
+- `DioxClient.mint_dio_with_sk(...)` / `DioxClient.transfer_with_sk(...)` are node-signing helpers
 
-This fixes the practical issue that Python SDK calls should behave like the working curl request.
+This keeps the two submission styles at the same level:
 
-However, this is a workaround at the SDK routing level, not a true fix for the raw `tx.send` path.
+- local signing: compose -> sign locally -> `tx.send`
+- node signing: send raw business inputs + private key -> `tx.send_withSK`
 
 
 ## Reproduction
@@ -48,7 +50,7 @@ curl --location --request GET 'http://101.33.210.216:45678/api?req=tx.send_withS
 }'
 ```
 
-Equivalent Python SDK calls now also succeed:
+Equivalent Python SDK calls for node-side signing also succeed:
 
 ```python
 client.send_transaction_with_sk(
@@ -58,19 +60,19 @@ client.send_transaction_with_sk(
 )
 ```
 
-and
+The local compose/sign/send path looks like this:
 
 ```python
-client.mint_dio(
-    account,
-    "999999999999999999999999999999",
-    sync=False,
+unsigned = client.compose_transaction(
+    sender=account.address,
+    function="core.coin.mint",
+    args={"Amount": "999999999999999999999999999999"},
 )
+signed = account.sign_diox_transaction(unsigned)
+client.send_raw_transaction(signed, sync=False)
 ```
 
-for `SM2`, because `send_transaction()` now defaults to node signing.
-
-### Failing raw path
+### Raw path
 
 This still fails:
 
@@ -95,14 +97,14 @@ Error:
 
 - `dioxide_python_sdk/client/dioxclient.py`
   - added `send_transaction_with_sk(...)`
-  - changed `send_transaction(...)` to auto-use node signing for `SM2`
-  - changed `mint_dio(...)` / `transfer(...)` to inherit that behavior
+  - kept `send_transaction(...)` on the local-signing path
+  - split `mint_dio(...)` / `transfer(...)` into local-signing helpers plus `mint_dio_with_sk(...)` / `transfer_with_sk(...)`
 - `tests/sm2_send_with_sk_live_test.py`
   - direct live test for `tx.send_withSK`
 - `tests/sm2_live_test.py`
   - live test showing current SM2 behavior
 - `tests/sm2_client_path_test.py`
-  - regression coverage for default SM2 routing
+  - regression coverage for local-signing and node-signing paths
 
 
 ## What Has Been Verified
@@ -289,7 +291,7 @@ Acceptance criteria:
 
 - `tx.send` returns a tx hash
 - the transaction is confirmed on chain
-- `use_node_signing=False` works for `SM2`
+- raw `tx.send` compatibility for `SM2` is still unresolved
 - SDK no longer needs to special-case `SM2` to avoid `tx.send`
 
 
@@ -337,6 +339,5 @@ PY
 
 At handoff time:
 
-- practical SDK behavior for SM2 is fixed by defaulting to `tx.send_withSK`
-- true raw `tx.send` compatibility for SM2 is still unresolved
-- root cause is narrowed to SM2 raw transaction packing / signing semantics on the node side
+- `send_transaction()` is the local-signing API, while `send_transaction_with_sk()` is the node-signing API
+- node-side `SEC_SUITE_SM2` support is confirmed, so the remaining gap is raw transaction compatibility rather than address-type support

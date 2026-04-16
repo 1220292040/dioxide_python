@@ -70,18 +70,18 @@ assert account is not None and account.is_valid()
 client = StubDioxClient()
 
 mint_tx = client.mint_dio(account, amount=123, sync=False, timeout=1)
-assert mint_tx == "fake_tx_hash_with_sk"
-assert client.last_private_key == account.sk_b64
-assert client.last_function == "core.coin.mint"
-assert client.last_args == {"Amount": "123"}
-assert client.last_sync is False
-
-local_mint_tx = client.mint_dio(account, amount=123, sync=False, timeout=1, use_node_signing=False)
-assert local_mint_tx == "fake_tx_hash"
+assert mint_tx == "fake_tx_hash"
 assert client.last_sender == "zqgx8f30g04qpd2fxxm9e05een3ytjp970vzbjnhctjrf7kj5per84cj34:sm2"
 assert client.last_function == "core.coin.mint"
 assert client.last_args == {"Amount": "123"}
 assert_signed_payload(client, account)
+
+mint_with_sk_tx = client.mint_dio_with_sk(account, amount=456, sync=False, timeout=1)
+assert mint_with_sk_tx == "fake_tx_hash_with_sk"
+assert client.last_private_key == account.sk_b64
+assert client.last_function == "core.coin.mint"
+assert client.last_args == {"Amount": "456"}
+assert client.last_sync is False
 
 proof_tx = client.send_transaction(
     user=account,
@@ -90,29 +90,34 @@ proof_tx = client.send_transaction(
     is_sync=False,
     timeout=1,
 )
-assert proof_tx == "fake_tx_hash_with_sk"
-assert client.last_function == "silas.ProofOfExistence.new"
-assert client.last_args == {"key": "KEY_demo", "content": "CONTENT_demo"}
-assert client.last_private_key == account.sk_b64
-assert client.last_sync is False
-
-local_proof_tx = client.send_transaction(
-    user=account,
-    function="silas.ProofOfExistence.new",
-    args={"key": "KEY_demo", "content": "CONTENT_demo"},
-    is_sync=False,
-    timeout=1,
-    use_node_signing=False,
-)
-assert local_proof_tx == "fake_tx_hash"
+assert proof_tx == "fake_tx_hash"
 assert client.last_sender == "zqgx8f30g04qpd2fxxm9e05een3ytjp970vzbjnhctjrf7kj5per84cj34:sm2"
 assert client.last_function == "silas.ProofOfExistence.new"
 assert client.last_args == {"key": "KEY_demo", "content": "CONTENT_demo"}
 assert_signed_payload(client, account)
 
-mint_with_sk_tx = client.mint_dio(account, amount=456, sync=False, timeout=1, use_node_signing=True)
-assert mint_with_sk_tx == "fake_tx_hash_with_sk"
+transfer_tx = client.transfer(
+    sender=account,
+    receiver="receiver_addr:sm2",
+    amount=789,
+    sync=False,
+    timeout=1,
+)
+assert transfer_tx == "fake_tx_hash"
+assert client.last_sender == "zqgx8f30g04qpd2fxxm9e05een3ytjp970vzbjnhctjrf7kj5per84cj34:sm2"
+assert client.last_function == "core.wallet.transfer"
+assert client.last_args == {"To": "receiver_addr:sm2", "Amount": "789", "TokenId": "DIO"}
+assert_signed_payload(client, account)
+
+transfer_with_sk_tx = client.transfer_with_sk(
+    sender=account,
+    receiver="receiver_addr:sm2",
+    amount=790,
+    sync=False,
+    timeout=1,
+)
+assert transfer_with_sk_tx == "fake_tx_hash_with_sk"
 assert client.last_private_key == account.sk_b64
-assert client.last_function == "core.coin.mint"
-assert client.last_args == {"Amount": "456"}
+assert client.last_function == "core.wallet.transfer"
+assert client.last_args == {"To": "receiver_addr:sm2", "Amount": "790", "TokenId": "DIO"}
 assert client.last_sync is False

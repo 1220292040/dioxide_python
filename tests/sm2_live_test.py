@@ -61,11 +61,10 @@ def main():
 
     try:
         if USE_NODE_SIGNING:
-            tx_hash = client.mint_dio(
+            tx_hash = client.mint_dio_with_sk(
                 user=account,
                 amount=AMOUNT,
                 sync=False,
-                use_node_signing=True,
             )
         else:
             tx_hash = client.send_raw_transaction(signed_txn, sync=False)
@@ -73,7 +72,7 @@ def main():
         print("broadcast:", "failed")
         print("error_code:", exc.code)
         print("error_message:", exc.message)
-        print("hint:", "try DIOX_USE_NODE_SIGNING=1 to use tx.send_withSK on the node")
+        print("hint:", "try DIOX_USE_NODE_SIGNING=1 for mint_dio_with_sk on the node")
         if exc.code == 10011:
             return
         raise

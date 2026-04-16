@@ -185,7 +185,7 @@ tx = client.compose_transaction(
 
 #### send_transaction(user, function, args, ...)
 
-Send a signed transaction.
+Send a locally signed transaction.
 
 ```python
 tx_hash = client.send_transaction(
@@ -198,8 +198,7 @@ tx_hash = client.send_transaction(
     gas_price=None,
     gas_limit=None,
     is_sync=False,
-    timeout=60,
-    use_node_signing=None
+    timeout=60
 )
 ```
 
@@ -207,7 +206,6 @@ tx_hash = client.send_transaction(
 - Same as `compose_transaction`
 - `is_sync` (bool): Wait for confirmation
 - `timeout` (int): Timeout for sync wait
-- `use_node_signing` (bool | None): Use RPC method `tx.send_withSK` instead of local compose/sign/send. `None` means auto-select, and SM2 accounts default to node signing so behavior matches the curl form that sends `privatekey`, `function`, and `args` to the node.
 
 **Returns**: `str` - transaction hash, or `None` if sync failed
 
@@ -248,12 +246,12 @@ tx_hash = client.send_raw_transaction(signed_tx, sync=True)
 
 **Returns**: `str` - transaction hash
 
-#### mint_dio(user, amount, sync=True, timeout=60, use_node_signing=None)
+#### mint_dio(user, amount, sync=True, timeout=60)
 
 Mint DIO tokens (testnet only).
 
 ```python
-tx_hash = client.mint_dio(account, 10**18, use_node_signing=True)
+tx_hash = client.mint_dio(account, 10**18)
 ```
 
 **Parameters**:
@@ -261,16 +259,31 @@ tx_hash = client.mint_dio(account, 10**18, use_node_signing=True)
 - `amount` (int): Amount in minimal units
 - `sync` (bool): Wait for confirmation
 - `timeout` (int): Timeout seconds
-- `use_node_signing` (bool | None): Route through `tx.send_withSK`. `None` auto-selects node signing for SM2 accounts.
 
 **Returns**: `str` - transaction hash
 
-#### transfer(sender, receiver, amount, token="DIO", sync=True, timeout=60, use_node_signing=None)
+#### mint_dio_with_sk(user, amount, sync=True, timeout=60)
+
+Mint DIO tokens through `tx.send_withSK`.
+
+```python
+tx_hash = client.mint_dio_with_sk(account, 10**18)
+```
+
+**Parameters**:
+- `user` (DioxAccount): Account to receive tokens
+- `amount` (int): Amount in minimal units
+- `sync` (bool): Wait for confirmation
+- `timeout` (int): Timeout seconds
+
+**Returns**: `str` - transaction hash
+
+#### transfer(sender, receiver, amount, token="DIO", sync=True, timeout=60)
 
 Transfer tokens between accounts.
 
 ```python
-tx_hash = client.transfer(sender, receiver_address, 100, token="DIO", use_node_signing=True)
+tx_hash = client.transfer(sender, receiver_address, 100, token="DIO")
 ```
 
 **Parameters**:
@@ -280,7 +293,24 @@ tx_hash = client.transfer(sender, receiver_address, 100, token="DIO", use_node_s
 - `token` (str): Token symbol
 - `sync` (bool): Wait for confirmation
 - `timeout` (int): Timeout seconds
-- `use_node_signing` (bool | None): Route through `tx.send_withSK`. `None` auto-selects node signing for SM2 accounts.
+
+**Returns**: `str` - transaction hash
+
+#### transfer_with_sk(sender, receiver, amount, token="DIO", sync=True, timeout=60)
+
+Transfer tokens through `tx.send_withSK`.
+
+```python
+tx_hash = client.transfer_with_sk(sender, receiver_address, 100, token="DIO")
+```
+
+**Parameters**:
+- `sender` (DioxAccount): Sender account
+- `receiver` (str): Receiver address
+- `amount` (int): Amount to transfer
+- `token` (str): Token symbol
+- `sync` (bool): Wait for confirmation
+- `timeout` (int): Timeout seconds
 
 **Returns**: `str` - transaction hash
 
