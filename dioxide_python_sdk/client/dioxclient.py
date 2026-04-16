@@ -7,7 +7,7 @@ from ..client import clientlogger
 from ..client.stat import StatTool
 from ..config.client_config import Config
 from ..utils.rpc import HTTPProvide
-from ..client.account import DioxAccount,DioxAddress,DioxAddressType
+from ..client.account import DioxAccount,DioxAccountType,DioxAddress,DioxAddressType
 from ..utils.gadget import exception_handler,get_subscribe_message,progress_bar
 from ..client.filters import (
     dapp_filter,
@@ -748,7 +748,21 @@ class DioxClient:
 
     #wrapper method ----------------------------------------------------------------
     @exception_handler
-    def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,delegatee=None,gas_price=None,gas_limit=None,is_sync=False,timeout=DEFAULT_TIMEOUT):
+    def send_transaction(self,user:DioxAccount,function:str,args:dict,tokens:list=None,isn=None,is_delegatee=False,delegatee=None,gas_price=None,gas_limit=None,is_sync=False,timeout=DEFAULT_TIMEOUT,use_node_signing=None):
+        if use_node_signing is None:
+            use_node_signing = user.account_type == DioxAccountType.SM2
+
+        if use_node_signing:
+            if delegatee is not None or is_delegatee or tokens is not None or isn is not None or gas_price is not None or gas_limit is not None:
+                raise DioxError(-10005, "use_node_signing only supports function and args")
+            return self.send_transaction_with_sk(
+                private_key=user.sk_b64,
+                function=function,
+                args=args,
+                sync=is_sync,
+                timeout=timeout,
+            )
+
         sender_addr = user.address
         if ":" not in sender_addr:
             sender_addr = sender_addr + ":" + user.account_type.name.lower()
@@ -775,18 +789,49 @@ class DioxClient:
         return tx_hash
 
     @exception_handler
-    def mint_dio(self,user:DioxAccount,amount,sync=True,timeout=DEFAULT_TIMEOUT):
-        tx_hash = self.send_transaction(user=user,function="core.coin.mint",args={"Amount":"{}".format(amount)},is_sync=sync,timeout=timeout)
+    def send_transaction_with_sk(self, private_key: str, function: str, args: dict, sync=False, timeout=DEFAULT_TIMEOUT):
+        method = "tx.send_withSK"
+        params = {
+            "privatekey": private_key,
+            "function": function,
+            "args": args,
+        }
+        response = self.make_request(method, params)
+        tx_hash = response["Hash"]
+        if sync:
+            if self.wait_for_transaction_confirmed(tx_hash, timeout):
+                return tx_hash
+            raise DioxError(-10000, "timeout")
         return tx_hash
 
     @exception_handler
-    def transfer(self,sender:DioxAccount,receiver,amount,token="DIO",delegatee=None,sync=True,timeout=DEFAULT_TIMEOUT):
+    def mint_dio(self,user:DioxAccount,amount,sync=True,timeout=DEFAULT_TIMEOUT,use_node_signing=None):
+        tx_hash = self.send_transaction(
+            user=user,
+            function="core.coin.mint",
+            args={"Amount":"{}".format(amount)},
+            is_sync=sync,
+            timeout=timeout,
+            use_node_signing=use_node_signing,
+        )
+        return tx_hash
+
+    @exception_handler
+    def transfer(self,sender:DioxAccount,receiver,amount,token="DIO",delegatee=None,sync=True,timeout=DEFAULT_TIMEOUT,use_node_signing=None):
         args = {
             "To":"{}".format(receiver),
             "Amount":"{}".format(amount),
             "TokenId":"{}".format(token)
         }
-        tx_hash = self.send_transaction(user=sender,function="core.wallet.transfer",args=args,delegatee=delegatee,is_sync=sync,timeout=timeout)
+        tx_hash = self.send_transaction(
+            user=sender,
+            function="core.wallet.transfer",
+            args=args,
+            delegatee=delegatee,
+            is_sync=sync,
+            timeout=timeout,
+            use_node_signing=use_node_signing,
+        )
         return tx_hash
 
     @exception_handler
@@ -1033,4 +1078,3 @@ class DioxClient:
             return {}
 
         return deserialized_args(signature, input_data)
-
