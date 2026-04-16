@@ -185,7 +185,7 @@ tx = client.compose_transaction(
 
 #### send_transaction(user, function, args, ...)
 
-Send a signed transaction.
+Send a locally signed transaction.
 
 ```python
 tx_hash = client.send_transaction(
@@ -208,6 +208,28 @@ tx_hash = client.send_transaction(
 - `timeout` (int): Timeout for sync wait
 
 **Returns**: `str` - transaction hash, or `None` if sync failed
+
+#### send_transaction_with_sk(private_key, function, args, sync=False, timeout=60)
+
+Send a transaction through RPC method `tx.send_withSK`.
+
+```python
+tx_hash = client.send_transaction_with_sk(
+    private_key=account.sk_b64,
+    function="core.coin.mint",
+    args={"Amount": "999999999999999999999999999999"},
+    sync=False,
+)
+```
+
+**Parameters**:
+- `private_key` (str): Base64 private key
+- `function` (str): Contract function
+- `args` (dict): Function arguments
+- `sync` (bool): Wait for confirmation
+- `timeout` (int): Timeout seconds
+
+**Returns**: `str` - transaction hash
 
 #### send_raw_transaction(signed_txn, sync=False, timeout=60)
 
@@ -240,12 +262,46 @@ tx_hash = client.mint_dio(account, 10**18)
 
 **Returns**: `str` - transaction hash
 
+#### mint_dio_with_sk(user, amount, sync=True, timeout=60)
+
+Mint DIO tokens through `tx.send_withSK`.
+
+```python
+tx_hash = client.mint_dio_with_sk(account, 10**18)
+```
+
+**Parameters**:
+- `user` (DioxAccount): Account to receive tokens
+- `amount` (int): Amount in minimal units
+- `sync` (bool): Wait for confirmation
+- `timeout` (int): Timeout seconds
+
+**Returns**: `str` - transaction hash
+
 #### transfer(sender, receiver, amount, token="DIO", sync=True, timeout=60)
 
 Transfer tokens between accounts.
 
 ```python
 tx_hash = client.transfer(sender, receiver_address, 100, token="DIO")
+```
+
+**Parameters**:
+- `sender` (DioxAccount): Sender account
+- `receiver` (str): Receiver address
+- `amount` (int): Amount to transfer
+- `token` (str): Token symbol
+- `sync` (bool): Wait for confirmation
+- `timeout` (int): Timeout seconds
+
+**Returns**: `str` - transaction hash
+
+#### transfer_with_sk(sender, receiver, amount, token="DIO", sync=True, timeout=60)
+
+Transfer tokens through `tx.send_withSK`.
+
+```python
+tx_hash = client.transfer_with_sk(sender, receiver_address, 100, token="DIO")
 ```
 
 **Parameters**:

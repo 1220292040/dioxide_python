@@ -7,7 +7,7 @@ from ..client import clientlogger
 from ..client.stat import StatTool
 from ..config.client_config import Config
 from ..utils.rpc import HTTPProvide
-from ..client.account import DioxAccount,DioxAddress,DioxAddressType
+from ..client.account import DioxAccount,DioxAccountType,DioxAddress,DioxAddressType
 from ..utils.gadget import exception_handler,get_subscribe_message,progress_bar
 from ..client.filters import (
     dapp_filter,
@@ -771,13 +771,46 @@ class DioxClient:
                                           gas_limit=gas_limit
                                         )
         signed_txn = user.sign_diox_transaction(unsigned_txn)
-        tx_hash = self.send_raw_transaction(signed_txn,is_sync,timeout)
+        if signed_txn is None:
+            raise DioxError(-10006, "failed to sign transaction")
+
+        return self.send_raw_transaction(signed_txn,is_sync,timeout)
+
+    @exception_handler
+    def send_transaction_with_sk(self, private_key: str, function: str, args: dict, sync=False, timeout=DEFAULT_TIMEOUT):
+        method = "tx.send_withSK"
+        params = {
+            "privatekey": private_key,
+            "function": function,
+            "args": args,
+        }
+        response = self.make_request(method, params)
+        tx_hash = response["Hash"]
+        if sync:
+            if self.wait_for_transaction_confirmed(tx_hash, timeout):
+                return tx_hash
+            raise DioxError(-10000, "timeout")
         return tx_hash
 
     @exception_handler
     def mint_dio(self,user:DioxAccount,amount,sync=True,timeout=DEFAULT_TIMEOUT):
-        tx_hash = self.send_transaction(user=user,function="core.coin.mint",args={"Amount":"{}".format(amount)},is_sync=sync,timeout=timeout)
-        return tx_hash
+        return self.send_transaction(
+            user=user,
+            function="core.coin.mint",
+            args={"Amount":"{}".format(amount)},
+            is_sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def mint_dio_with_sk(self,user:DioxAccount,amount,sync=True,timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction_with_sk(
+            private_key=user.sk_b64,
+            function="core.coin.mint",
+            args={"Amount":"{}".format(amount)},
+            sync=sync,
+            timeout=timeout,
+        )
 
     @exception_handler
     def transfer(self,sender:DioxAccount,receiver,amount,token="DIO",delegatee=None,sync=True,timeout=DEFAULT_TIMEOUT):
@@ -786,8 +819,29 @@ class DioxClient:
             "Amount":"{}".format(amount),
             "TokenId":"{}".format(token)
         }
-        tx_hash = self.send_transaction(user=sender,function="core.wallet.transfer",args=args,delegatee=delegatee,is_sync=sync,timeout=timeout)
-        return tx_hash
+        return self.send_transaction(
+            user=sender,
+            function="core.wallet.transfer",
+            args=args,
+            delegatee=delegatee,
+            is_sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def transfer_with_sk(self,sender:DioxAccount,receiver,amount,token="DIO",sync=True,timeout=DEFAULT_TIMEOUT):
+        args = {
+            "To":"{}".format(receiver),
+            "Amount":"{}".format(amount),
+            "TokenId":"{}".format(token)
+        }
+        return self.send_transaction_with_sk(
+            private_key=sender.sk_b64,
+            function="core.wallet.transfer",
+            args=args,
+            sync=sync,
+            timeout=timeout,
+        )
 
     @exception_handler
     def create_dapp(self,user:DioxAccount,dapp_name,deposit_amount,sync=True,timeout=DEFAULT_TIMEOUT):
@@ -1033,4 +1087,3 @@ class DioxClient:
             return {}
 
         return deserialized_args(signature, input_data)
-
