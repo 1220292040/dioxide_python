@@ -14,7 +14,12 @@ still fails with:
 (10011, 'insert txpool rejected.')
 ```
 
-This means the SDK is currently usable for SM2 accounts only by routing through node-side signing (`tx.send_withSK`), not by producing a raw signed transaction locally and sending it with `tx.send`.
+Current conclusion:
+
+- SM2 local signing for `tx.send` is not supported by the current Python SDK implementation.
+- The supported SM2 submission path is node-side signing through `tx.send_withSK`.
+
+This is not just a convenience difference. The Python SDK's current local SM2 signature output is not compatible with the live node behavior that accepts the working curl request.
 
 
 ## Current User-Facing Status
@@ -195,21 +200,80 @@ still failed in both cases.
 So there may be aliasing on the node, but it is not the root cause by itself.
 
 
-## Current Hypotheses
+### 7. Node `tx.send_withSK` performs its own compose/finalize flow
 
-The remaining likely causes are:
+From the investigated node-side source, `tx.send_withSK` does not accept a caller-built raw transaction.
 
-1. The raw signed transaction layout expected by node `tx.send` for `SM2` differs from the SDK's current `sign_diox_transaction(...)` implementation.
+It:
 
-2. The signing payload for `SM2` is not the same as:
+- composes a transaction internally
+- finalizes signer data internally
+- signs inside node code
+- appends PoW inside node code
+- then inserts the finished transaction into the txpool
 
-```text
-unsigned_tx + sid + public_key
-```
+So `tx.send_withSK` success does not prove that Python local raw signing is generating the same bytes as the node.
 
-3. The node may use a special SM2 raw transaction packing rule that is not visible from `tx.send_withSK`.
 
-4. The node may be transforming `core.coin.mint` into another invocation form before signing/sending, so the `tx.compose` output used by the SDK is not byte-equivalent to the node's internal unsigned tx.
+### 8. Node-side `SM2` uses a different signing implementation family
+
+From the investigated native security library:
+
+- curve: `sm2p256v1`
+- signing scheme: `SM2_Sig(SM3)`
+- implementation family: native security code using `Botan`
+
+Python local signing currently uses `gmssl.sign_with_sm3(...)`.
+
+So the two sides are not using the same implementation stack.
+
+
+### 9. Python local SM2 signature failed verification against node-side security code
+
+A fixed Python-generated test vector was created with:
+
+- the same private key
+- the same public key fixture
+- the same local signing payload
+- a signature produced by Python local signing
+
+That signature was then verified against the investigated node-side security implementation.
+
+Result:
+
+- verification failed
+
+This is the strongest confirmed reason that local SM2 signing is currently unsupported.
+
+
+### 10. The available source tree and the live node behavior are not perfectly aligned
+
+The investigated source tree helped narrow down the signing flow, but it did not fully explain the live behavior of `101.33.210.216:45678`.
+
+Examples of mismatch:
+
+- the live node accepts the curl request for SM2
+- the investigated source suggests different default private-key import behavior in one path
+- public key / address derivation observations from the investigated native helper path did not line up cleanly with the live node observations
+
+So the source tree was useful for diagnosis, but it was not sufficient to safely implement a byte-perfect local-signing fix for the live node.
+
+
+## Current Conclusion
+
+The current SDK should treat SM2 local signing as unsupported for `tx.send`.
+
+The concrete reason is:
+
+1. Python local SM2 signing currently relies on `gmssl`.
+2. The node-side accepted SM2 path uses a different native implementation family and signing behavior.
+3. A Python-generated local SM2 signature failed verification against the investigated node-side security implementation.
+4. Therefore the SDK cannot currently guarantee that `sign_diox_transaction(...)` produces a raw transaction accepted by `tx.send`.
+
+So the safe product behavior is:
+
+- use `tx.send_withSK` for SM2
+- do not claim that local SM2 signing is supported for `tx.send`
 
 
 ## Most Relevant Code
@@ -252,24 +316,17 @@ Methods:
 - `send_transaction_with_sk(...)`
 
 
-## Suggested Next Steps On A Machine With Node Source
+## Suggested Future Fix Direction
 
-The best next step is to inspect the node implementation of:
+If local SM2 signing is ever revisited, it should not be re-enabled by guesswork.
 
-- `tx.send`
-- `tx.send_withSK`
-- SM2 transaction verification / signer extraction
-- SM2 raw signed transaction decoding
+A real fix should start from one of these:
 
-Questions to answer from node source:
+1. Use the exact same signing implementation as the live node.
+2. Build a tiny local bridge around the same native security library used by the accepted node path.
+3. Obtain the exact live-node source version and verify the full raw transaction build path end to end.
 
-1. For `tx.send`, what exact binary layout is expected?
-2. What bytes are covered by the SM2 signature?
-3. Is `sid` included in signed payload, and where?
-4. Is public key embedded in raw tx, and where?
-5. How many PoW nonces are expected?
-6. Is `tx.compose` output byte-identical to the unsigned tx built inside `tx.send_withSK`?
-7. Does `core.coin.mint` get rewritten to `core.coin.address.mint` before signing?
+Until then, `tx.send_withSK` should be considered the only supported SM2 submission path.
 
 
 ## Useful Validation Target
@@ -291,7 +348,7 @@ Acceptance criteria:
 
 - `tx.send` returns a tx hash
 - the transaction is confirmed on chain
-- raw `tx.send` compatibility for `SM2` is still unresolved
+- local SM2 signing is truly accepted by `tx.send`
 - SDK no longer needs to special-case `SM2` to avoid `tx.send`
 
 
@@ -340,4 +397,6 @@ PY
 At handoff time:
 
 - `send_transaction()` is the local-signing API, while `send_transaction_with_sk()` is the node-signing API
-- node-side `SEC_SUITE_SM2` support is confirmed, so the remaining gap is raw transaction compatibility rather than address-type support
+- node-side SM2 support is confirmed by the working curl request
+- local SM2 signing for `tx.send` is not supported in the current Python SDK
+- the immediate technical reason is signature incompatibility between Python local signing and the investigated node-side verification behavior
