@@ -777,13 +777,38 @@ class DioxClient:
         return self.send_raw_transaction(signed_txn,is_sync,timeout)
 
     @exception_handler
-    def send_transaction_with_sk(self, private_key: str, function: str, args: dict, sync=False, timeout=DEFAULT_TIMEOUT):
+    def send_transaction_with_sk(
+        self,
+        private_key: str,
+        function: str,
+        args: dict,
+        tokens: list = None,
+        isn=None,
+        delegatee=None,
+        gas_price=None,
+        gas_limit=None,
+        ttl=None,
+        sync=False,
+        timeout=DEFAULT_TIMEOUT,
+    ):
         method = "tx.send_withSK"
         params = {
             "privatekey": private_key,
             "function": function,
             "args": args,
         }
+        if delegatee is not None:
+            params["delegatee"] = delegatee
+        if gas_price is not None:
+            params["gasprice"] = gas_price
+        if gas_limit is not None:
+            params["gaslimit"] = gas_limit
+        if isn is not None:
+            params["isn"] = isn
+        if tokens is not None:
+            params["tokens"] = tokens
+        if ttl is not None:
+            params["ttl"] = ttl
         response = self.make_request(method, params)
         tx_hash = response["Hash"]
         if sync:

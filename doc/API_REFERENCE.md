@@ -209,7 +209,7 @@ tx_hash = client.send_transaction(
 
 **Returns**: `str` - transaction hash, or `None` if sync failed
 
-#### send_transaction_with_sk(private_key, function, args, sync=False, timeout=60)
+#### send_transaction_with_sk(private_key, function, args, tokens=None, isn=None, delegatee=None, gas_price=None, gas_limit=None, ttl=None, sync=False, timeout=60)
 
 Send a transaction through RPC method `tx.send_withSK`.
 
@@ -218,6 +218,8 @@ tx_hash = client.send_transaction_with_sk(
     private_key=account.sk_b64,
     function="core.coin.mint",
     args={"Amount": "999999999999999999999999999999"},
+    gas_price=1000,
+    gas_limit=100000,
     sync=False,
 )
 ```
@@ -226,6 +228,12 @@ tx_hash = client.send_transaction_with_sk(
 - `private_key` (str): Base64 private key
 - `function` (str): Contract function
 - `args` (dict): Function arguments
+- `tokens` (list, optional): Supplied token list
+- `isn` (int, optional): Override issue serial number
+- `delegatee` (str, optional): Delegatee address for delegated calls
+- `gas_price` (int, optional): Gas price override
+- `gas_limit` (int, optional): Gas limit override
+- `ttl` (int, optional): Transaction TTL override
 - `sync` (bool): Wait for confirmation
 - `timeout` (int): Timeout seconds
 
