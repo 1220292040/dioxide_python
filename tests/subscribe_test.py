@@ -1,11 +1,33 @@
 import sys
 import time
 import threading
+import os
+import socket
+from urllib.parse import urlparse
 import pytest
 
 sys.path.append('.')
 from dioxide_python_sdk.client.dioxclient import DioxClient
 from dioxide_python_sdk.client.types import SubscribeTopic
+
+
+def _endpoint_available(url: str, timeout: float = 0.5) -> bool:
+    parsed = urlparse(url)
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port or (443 if parsed.scheme in {"https", "wss"} else 80)
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+_default_rpc = os.environ.get("DIOX_RPC_URL", "http://127.0.0.1:45678/api")
+_default_ws = os.environ.get("DIOX_WS_URL", _default_rpc.replace("http", "ws", 1))
+pytestmark = pytest.mark.skipif(
+    not (_endpoint_available(_default_rpc) and _endpoint_available(_default_ws)),
+    reason="Subscribe tests require running DIOX RPC and WS endpoints",
+)
 
 
 class TestSubscribe:
@@ -165,4 +187,3 @@ if __name__ == "__main__":
         pass
     
     print(f"Received {len(received)} blocks in {time.time() - start:.2f} seconds")
-
