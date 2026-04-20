@@ -49,3 +49,4 @@ htmlcov/
 cspell.config.yaml
 test_contracts/*.html
 test_contracts/*.log
+AGENTS.md
