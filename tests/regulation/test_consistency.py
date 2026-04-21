@@ -33,6 +33,9 @@ class TestConsistency:
         ("contract_name", "kyc"),
         ("impl_cid", 123),
         ("app_cid", 456),
+        ("dapp_contract", "dappA.kyc"),
+        ("target_dapp_contract", "appA.token"),
+        ("audit_dapp_contract", "dappA.kyc"),
     ])
     def test_old_field_rejected(self, client, regulator, bad_field, value):
         with pytest.raises(ValueError, match="Obsolete field"):

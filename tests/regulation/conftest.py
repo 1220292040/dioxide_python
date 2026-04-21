@@ -2,8 +2,6 @@
 import os
 import sys
 import uuid
-from urllib.parse import urlparse
-import socket
 
 import pytest
 
@@ -21,24 +19,6 @@ REGULATOR_KEY_B64 = "6NHi+B1jWQ3gDfC2GFHHBoNPEhCWa9lkIUMGRtRc2LbYtNrHang1QL/XdXt
 _SUFFIX = uuid.uuid4().hex[:4]
 AUDIT_DAPP = f"F7{_SUFFIX}"
 TARGET_DAPP = f"TG{_SUFFIX}"
-
-
-def _rpc_available(url: str, timeout: float = 0.5) -> bool:
-    parsed = urlparse(url)
-    host = parsed.hostname or "127.0.0.1"
-    port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
-
-
-@pytest.fixture(scope="session", autouse=True)
-def ensure_regulation_rpc_available():
-    rpc_url = os.environ.get("DIOX_RPC_URL", "http://127.0.0.1:45678/api")
-    if not _rpc_available(rpc_url):
-        pytest.skip(f"Regulation integration tests require RPC at {rpc_url}")
 
 
 @pytest.fixture(scope="session")

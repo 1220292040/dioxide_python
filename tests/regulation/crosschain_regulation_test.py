@@ -262,28 +262,28 @@ def env(client, deployer, regulator,
 
     tx = client.regulation_call_audit_proxy(
         regulator, "core.AuditProxy.register",
-        {"dapp_contract": kyc_dc, "cid": kyc_cid},
+        {"audit_dc": kyc_dc, "cid": kyc_cid},
         sync=True)
     assert tx is not None, "regulation_call_audit_proxy register(kyc) tx returned None"
     _assert_relay_success(tx, "register(kyc)")
 
     tx = client.regulation_call_audit_proxy(
         regulator, "core.AuditProxy.register",
-        {"dapp_contract": cft_dc, "cid": cft_cid},
+        {"audit_dc": cft_dc, "cid": cft_cid},
         sync=True)
     assert tx is not None, "regulation_call_audit_proxy register(cft) tx returned None"
     _assert_relay_success(tx, "register(cft)")
 
     tx = client.regulation_call_audit_proxy(
         regulator, "core.AuditProxy.bind",
-        {"target_dapp_contract": ct_dc, "audit_dapp_contract": cft_dc},
+        {"target_dc": ct_dc, "audit_dc": cft_dc},
         sync=True)
     assert tx is not None, "regulation_call_audit_proxy bind(cft->ct) tx returned None"
     _assert_relay_success(tx, "bind(cft->ct)")
 
     tx = client.regulation_call_audit_proxy(
         regulator, "core.AuditProxy.bind",
-        {"target_dapp_contract": app_dc, "audit_dapp_contract": kyc_dc},
+        {"target_dc": app_dc, "audit_dc": kyc_dc},
         sync=True)
     assert tx is not None, "regulation_call_audit_proxy bind(kyc->app) tx returned None"
     _assert_relay_success(tx, "bind(kyc->app)")
@@ -404,8 +404,8 @@ class TestCC3UnbindRestoresAccess:
             self, client, regulator, user_blocked, env, audit_dapp, cc_dapp):
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unbind",
-            {"target_dapp_contract": env["ct_dc"],
-             "audit_dapp_contract": audit_dapp["cft_dapp_contract"]},
+            {"target_dc": env["ct_dc"],
+             "audit_dc": audit_dapp["cft_dapp_contract"]},
             sync=True)
         _, ok = _send_tx(
             client, user_blocked,
@@ -418,8 +418,8 @@ class TestCC3UnbindRestoresAccess:
             self, client, regulator, user_blocked, env, audit_dapp, cc_dapp):
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unbind",
-            {"target_dapp_contract": env["app_dc"],
-             "audit_dapp_contract": audit_dapp["kyc_dapp_contract"]},
+            {"target_dc": env["app_dc"],
+             "audit_dc": audit_dapp["kyc_dapp_contract"]},
             sync=True)
         _, ok = _send_tx(
             client, user_blocked,

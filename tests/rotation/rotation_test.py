@@ -1,7 +1,5 @@
 import sys
 import os
-from urllib.parse import urlparse
-import socket
 import pytest
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -11,23 +9,6 @@ from dioxide_python_sdk.client.account import DioxAccount
 from dioxide_python_sdk.client.contract import (
     CORE_CONTRACT_ROTATION_GLOBAL,
     CORE_CONTRACT_ROTATION,
-)
-
-
-def _rpc_available(url: str, timeout: float = 0.5) -> bool:
-    parsed = urlparse(url)
-    host = parsed.hostname or "127.0.0.1"
-    port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
-
-
-pytestmark = pytest.mark.skipif(
-    not _rpc_available(os.environ.get("DIOX_RPC_URL", "http://127.0.0.1:45678/api")),
-    reason="Rotation integration tests require a running DIOX RPC",
 )
 
 

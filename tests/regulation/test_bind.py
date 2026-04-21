@@ -10,7 +10,7 @@ class TestBind:
         kyc_cid = audit_dapp_deployed["kyc_cid"]
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": kyc_dc, "cid": kyc_cid},
+            {"audit_dc": kyc_dc, "cid": kyc_cid},
             sync=True,
         )
 
@@ -20,7 +20,7 @@ class TestBind:
         cft_dc = audit_dapp_deployed["cft_dc"]
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.bind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )
         assert tx is not None
@@ -31,7 +31,7 @@ class TestBind:
         cft_dc = audit_dapp_deployed["cft_dc"]
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.bind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )
         assert tx is not None
@@ -40,7 +40,7 @@ class TestBind:
     def test_bind_unregistered_audit(self, client, regulator):
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.bind",
-            {"target_dapp_contract": "appX.token", "audit_dapp_contract": "unknown.audit"},
+            {"target_dc": "appX.token", "audit_dc": "unknown.audit"},
             sync=True,
         )
         assert tx is not None  # tx lands; AuditResult.ok=false inside
@@ -49,7 +49,7 @@ class TestBind:
         kyc_dc = audit_dapp_deployed["kyc_dc"]
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.bind",
-            {"target_dapp_contract": kyc_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": kyc_dc, "audit_dc": kyc_dc},
             sync=True,
         )
         assert tx is not None  # tx lands; AuditResult.ok=false inside

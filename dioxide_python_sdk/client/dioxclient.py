@@ -908,7 +908,17 @@ class DioxClient:
 
     # Regulation-managed AuditProxy administration -------------------------------
     _OLD_AUDIT_PROXY_FIELDS = frozenset(
-        {"check_name", "audit_name", "dapp_name", "contract_name", "impl_cid", "app_cid"}
+        {
+            "check_name",
+            "audit_name",
+            "dapp_name",
+            "contract_name",
+            "impl_cid",
+            "app_cid",
+            "dapp_contract",
+            "target_dapp_contract",
+            "audit_dapp_contract",
+        }
     )
 
     def _validate_regulation_audit_proxy_args(self, function_name: str, args: dict):
@@ -916,7 +926,7 @@ class DioxClient:
         if bad:
             raise ValueError(
                 f"Obsolete field(s) {sorted(bad)} in {function_name} args; "
-                "use dapp_contract / target_dapp_contract / audit_dapp_contract / cid instead"
+                "use audit_dc / target_dc / cid instead"
             )
 
     def _normalize_regulation_audit_proxy_args(self, function_name: str, args):

@@ -51,7 +51,7 @@ class TestRegulationAuditProxyCalls(unittest.TestCase):
         result = self.client.regulation_call_audit_proxy(
             regulator=regulator,
             function_name="core.AuditProxy.register",
-            args={"dapp_contract": "audit.KycAudit", "cid": 7},
+            args={"audit_dc": "audit.KycAudit", "cid": 7},
             sync=False,
         )
 
@@ -62,7 +62,7 @@ class TestRegulationAuditProxyCalls(unittest.TestCase):
         self.assertEqual(call.kwargs["args"]["function_name"], "core.AuditProxy.register")
         self.assertEqual(
             json.loads(call.kwargs["args"]["args_json"]),
-            {"dapp_contract": "audit.KycAudit", "cid": 7},
+            {"audit_dc": "audit.KycAudit", "cid": 7},
         )
         self.assertFalse(call.kwargs["is_sync"])
         self.assertTrue(result.ok)
@@ -76,15 +76,15 @@ class TestRegulationAuditProxyCalls(unittest.TestCase):
             regulator=regulator,
             function_name="core.AuditProxy.bind",
             args={
-                "target_dapp_contract": "app.Token",
-                "audit_dapp_contract": "audit.KycAudit",
+                "target_dc": "app.Token",
+                "audit_dc": "audit.KycAudit",
             },
             sync=False,
         )
 
         payload = json.loads(mock_send_transaction.call_args.kwargs["args"]["args_json"])
-        self.assertEqual(payload["target_dapp_contract"], "app.Token")
-        self.assertEqual(payload["audit_dapp_contract"], "audit.KycAudit")
+        self.assertEqual(payload["target_dc"], "app.Token")
+        self.assertEqual(payload["audit_dc"], "audit.KycAudit")
         self.assertTrue(result.ok)
 
     def test_regulation_call_audit_proxy_rejects_obsolete_fields(self):
