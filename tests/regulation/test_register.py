@@ -10,7 +10,7 @@ class TestRegister:
         kyc_cid = audit_dapp_deployed["kyc_cid"]
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": kyc_dc, "cid": kyc_cid},
+            {"audit_dc": kyc_dc, "cid": kyc_cid},
             sync=True,
         )
         assert tx is not None
@@ -21,7 +21,7 @@ class TestRegister:
         kyc_cid = audit_dapp_deployed["kyc_cid"]
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": kyc_dc, "cid": kyc_cid},
+            {"audit_dc": kyc_dc, "cid": kyc_cid},
             sync=True,
         )
         assert tx is not None
@@ -34,13 +34,13 @@ class TestRegister:
         # First register with kyc_cid (wrong cid, just to test overwrite)
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": cft_dc, "cid": kyc_cid},
+            {"audit_dc": cft_dc, "cid": kyc_cid},
             sync=True,
         )
         # Now overwrite with correct cft_cid
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": cft_dc, "cid": cft_cid},
+            {"audit_dc": cft_dc, "cid": cft_cid},
             sync=True,
         )
         assert tx is not None

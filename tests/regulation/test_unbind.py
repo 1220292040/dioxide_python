@@ -11,18 +11,18 @@ class TestUnbind:
         # Ensure registered and bound
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": kyc_dc, "cid": kyc_cid},
+            {"audit_dc": kyc_dc, "cid": kyc_cid},
             sync=True,
         )
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.bind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )
         # First unbind
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unbind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )
         assert tx is not None
@@ -30,7 +30,7 @@ class TestUnbind:
         # Second unbind — idempotent
         tx2 = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unbind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )
         assert tx2 is not None
@@ -43,29 +43,29 @@ class TestUnbind:
         # Register, bind, unregister (force dangling), then unbind
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": kyc_dc, "cid": kyc_cid},
+            {"audit_dc": kyc_dc, "cid": kyc_cid},
             sync=True,
         )
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.bind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )
         # Unbind first so unregister succeeds
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unbind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unregister",
-            {"dapp_contract": kyc_dc},
+            {"audit_dc": kyc_dc},
             sync=True,
         )
         # Now unbind again — dangling entry cleanup
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unbind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )
         assert tx is not None

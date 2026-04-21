@@ -11,7 +11,7 @@ class TestAudit:
         # Ensure kyc is registered but NOT bound to any target
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": kyc_dc, "cid": kyc_cid},
+            {"audit_dc": kyc_dc, "cid": kyc_cid},
             sync=True,
         )
         # No bind step — audit on an unbound target should return no bindings
@@ -27,12 +27,12 @@ class TestAudit:
         cft_cid = audit_dapp_deployed["cft_cid"]
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": kyc_dc, "cid": kyc_cid},
+            {"audit_dc": kyc_dc, "cid": kyc_cid},
             sync=True,
         )
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": cft_dc, "cid": cft_cid},
+            {"audit_dc": cft_dc, "cid": cft_cid},
             sync=True,
         )
         # Approve deployer for KYC
@@ -49,7 +49,7 @@ class TestAudit:
         cft_cid = audit_dapp_deployed["cft_cid"]
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": cft_dc, "cid": cft_cid},
+            {"audit_dc": cft_dc, "cid": cft_cid},
             sync=True,
         )
         # Binding exists; a sanctioned sender would trigger short-circuit
@@ -62,18 +62,18 @@ class TestAudit:
         cft_dc = audit_dapp_deployed["cft_dc"]
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": kyc_dc, "cid": kyc_cid},
+            {"audit_dc": kyc_dc, "cid": kyc_cid},
             sync=True,
         )
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.bind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )
         # Cleanup
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unbind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )
 

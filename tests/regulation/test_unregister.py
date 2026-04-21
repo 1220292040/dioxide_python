@@ -11,12 +11,12 @@ class TestUnregister:
         # Ensure registered
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": kyc_dc, "cid": kyc_cid},
+            {"audit_dc": kyc_dc, "cid": kyc_cid},
             sync=True,
         )
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unregister",
-            {"dapp_contract": kyc_dc},
+            {"audit_dc": kyc_dc},
             sync=True,
         )
         assert tx is not None
@@ -27,7 +27,7 @@ class TestUnregister:
         # Already unregistered from previous test
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unregister",
-            {"dapp_contract": kyc_dc},
+            {"audit_dc": kyc_dc},
             sync=True,
         )
         assert tx is not None
@@ -41,31 +41,31 @@ class TestUnregister:
         # Register both
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": cft_dc, "cid": cft_cid},
+            {"audit_dc": cft_dc, "cid": cft_cid},
             sync=True,
         )
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.register",
-            {"dapp_contract": kyc_dc, "cid": kyc_cid},
+            {"audit_dc": kyc_dc, "cid": kyc_cid},
             sync=True,
         )
         # Bind kyc to cft (target=cft, audit=kyc)
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.bind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )
         # Attempt to unregister kyc while still bound — tx succeeds at chain level
         # but AuditResult.ok should be false; we just verify the tx lands
         tx = client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unregister",
-            {"dapp_contract": kyc_dc},
+            {"audit_dc": kyc_dc},
             sync=True,
         )
         assert tx is not None
         # Cleanup
         client.regulation_call_audit_proxy(
             regulator, "core.AuditProxy.unbind",
-            {"target_dapp_contract": cft_dc, "audit_dapp_contract": kyc_dc},
+            {"target_dc": cft_dc, "audit_dc": kyc_dc},
             sync=True,
         )

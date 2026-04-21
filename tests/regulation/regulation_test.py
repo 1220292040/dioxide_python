@@ -1,7 +1,5 @@
 import sys
 import os
-from urllib.parse import urlparse
-import socket
 import pytest
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -10,23 +8,6 @@ from dioxide_python_sdk.client.dioxclient import DioxClient, AuditProxyResult
 from dioxide_python_sdk.client.account import DioxAccount
 from dioxide_python_sdk.client.contract import (
     CORE_CONTRACT_REGULATION_GLOBAL,
-)
-
-
-def _rpc_available(url: str, timeout: float = 0.5) -> bool:
-    parsed = urlparse(url)
-    host = parsed.hostname or "127.0.0.1"
-    port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
-
-
-pytestmark = pytest.mark.skipif(
-    not _rpc_available(os.environ.get("DIOX_RPC_URL", "http://127.0.0.1:45678/api")),
-    reason="Regulation integration tests require a running DIOX RPC",
 )
 
 
@@ -104,7 +85,7 @@ class TestRegulationAuditProxy:
         result = client.regulation_call_audit_proxy(
             regulator=regulator,
             function_name="core.AuditProxy.register",
-            args={"dapp_contract": "dappA.kyc", "cid": 0},
+            args={"audit_dc": "dappA.kyc", "cid": 0},
             sync=True,
         )
         assert isinstance(result, AuditProxyResult)
@@ -114,7 +95,7 @@ class TestRegulationAuditProxy:
         result = client.regulation_call_audit_proxy(
             regulator=regulator,
             function_name="core.AuditProxy.bind",
-            args={"target_dapp_contract": "appA.token", "audit_dapp_contract": "dappA.kyc"},
+            args={"target_dc": "appA.token", "audit_dc": "dappA.kyc"},
             sync=True,
         )
         assert isinstance(result, AuditProxyResult)
@@ -124,7 +105,7 @@ class TestRegulationAuditProxy:
         result = client.regulation_call_audit_proxy(
             regulator=regulator,
             function_name="core.AuditProxy.unbind",
-            args={"target_dapp_contract": "appA.token", "audit_dapp_contract": "dappA.kyc"},
+            args={"target_dc": "appA.token", "audit_dc": "dappA.kyc"},
             sync=True,
         )
         assert isinstance(result, AuditProxyResult)
@@ -134,7 +115,7 @@ class TestRegulationAuditProxy:
         result = client.regulation_call_audit_proxy(
             regulator=regulator,
             function_name="core.AuditProxy.unregister",
-            args={"dapp_contract": "dappA.kyc"},
+            args={"audit_dc": "dappA.kyc"},
             sync=True,
         )
         assert isinstance(result, AuditProxyResult)

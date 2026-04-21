@@ -1,31 +1,9 @@
-import os
-import socket
 import sys
-from urllib.parse import urlparse
-
-import pytest
 
 sys.path.append(".")
 
 from dioxide_python_sdk.client.dioxclient import DioxClient
 from dioxide_python_sdk.client.types import GLOBAL_IDENTIFIER
-
-
-def _rpc_available(url: str, timeout: float = 0.5) -> bool:
-    parsed = urlparse(url)
-    host = parsed.hostname or "127.0.0.1"
-    port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
-
-
-pytestmark = pytest.mark.skipif(
-    not _rpc_available(os.environ.get("DIOX_RPC_URL", "http://127.0.0.1:45678/api")),
-    reason="Block smoke test requires a running DIOX RPC",
-)
 
 
 def test_block_queries_smoke():
