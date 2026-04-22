@@ -1,12 +1,8 @@
 """End-to-end test: cross-chain contract regulation via core.regulation.
 
-Reuses the system-predeployed ``core.AuditProxy`` behind the builtin
-``core.regulation`` entrypoints, deploys PREDA audit
-implementations (KycAudit, CftAudit) that import ``core.AuditInterface``
-directly, and GCL cross-chain
+Deploys test-local ``KYC`` / ``CFT`` audit contracts, deploys GCL cross-chain
 contracts (CrossTransfer, AppContract), then verifies that the regulation-managed
-AuditProxy correctly
-regulates function calls on real user-deployed contracts.
+AuditProxy correctly regulates function calls on real user-deployed contracts.
 
 Test matrix:
   - IT-CC1: KYC audit on AppContract
@@ -30,13 +26,13 @@ from dioxide_python_sdk.client.account import DioxAccount
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONTRACTS_DIR = os.path.join(BASE_DIR, "contracts")
 CROSSCHAIN_DIR = os.path.join(CONTRACTS_DIR, "crosschain")
-REG_CONTRACTS_DIR = os.path.abspath(
-    os.path.join(BASE_DIR, "..", "..", "..", "oxd_bc", "rvm_contracts")
-)
 CORE_AUDIT_DAPP = "core"
+REG_CONTRACTS_DIR = os.path.abspath(
+    os.path.join(BASE_DIR, "..", "..", "..", "oxd_bc", "src", "rvm", "contracts", "regulation")
+)
 
 _SUFFIX = uuid.uuid4().hex[:4]
-AUDIT_DAPP = f"RA{_SUFFIX}"
+AUDIT_DAPP = f"F7CC{_SUFFIX}"
 CC_DAPP = f"CC{_SUFFIX}"
 
 REGULATOR_KEY_B64 = "6NHi+B1jWQ3gDfC2GFHHBoNPEhCWa9lkIUMGRtRc2LbYtNrHang1QL/XdXt0pSAVw0v4cX7iDz55Ksnf41cIfA=="
@@ -134,33 +130,37 @@ def user_plain(client):
 
 
 @pytest.fixture(scope="module")
-def audit_dapp(client, deployer):
-    """Deploy audit implementations and reuse the predeployed core AuditProxy."""
-    _, ok = client.create_dapp(deployer, AUDIT_DAPP, 10**12)
+def audit_dapp(client):
+    """Deploy KYC and CFT under a dedicated test dapp."""
+    proxy_info = client.get_contract_info(CORE_AUDIT_DAPP, "AuditProxy")
+    owner = DioxAccount.generate_key_pair()
+    client.mint_dio(owner, 10**18)
+
+    _, ok = client.create_dapp(owner, AUDIT_DAPP, 10**12)
     assert ok, f"Failed to create audit dapp {AUDIT_DAPP}"
 
     contracts = {
-        os.path.join(REG_CONTRACTS_DIR, "kyc_audit.prd"): None,
-        os.path.join(REG_CONTRACTS_DIR, "cft_audit.prd"): None,
+        os.path.join(REG_CONTRACTS_DIR, "kyc.prd"): None,
+        os.path.join(REG_CONTRACTS_DIR, "cft.prd"): None,
     }
-    tx = client.deploy_contracts(AUDIT_DAPP, deployer, contracts, compile_time=20)
+    tx = client.deploy_contracts(AUDIT_DAPP, owner, contracts, compile_time=20)
     assert tx is not None, "Audit contracts deploy failed"
 
-    proxy_info = client.get_contract_info(CORE_AUDIT_DAPP, "AuditProxy")
-    kyc_info = client.get_contract_info(AUDIT_DAPP, "KycAudit")
-    cft_info = client.get_contract_info(AUDIT_DAPP, "CftAudit")
+    kyc_info = client.get_contract_info(AUDIT_DAPP, "KYC")
+    cft_info = client.get_contract_info(AUDIT_DAPP, "CFT")
     regulation_state = client.get_regulation_state()
     assert int(regulation_state.State.AuditContractIdRaw) == int(proxy_info.ContractID)
 
     return {
+        "owner": owner,
         "proxy_cid": proxy_info.ContractID,
         "proxy_cvid": proxy_info.ContractVersionID,
         "kyc_cid": kyc_info.ContractID,
         "kyc_cvid": kyc_info.ContractVersionID,
         "cft_cid": cft_info.ContractID,
         "cft_cvid": cft_info.ContractVersionID,
-        "kyc_dapp_contract": f"{AUDIT_DAPP}.KycAudit",
-        "cft_dapp_contract": f"{AUDIT_DAPP}.CftAudit",
+        "kyc_dapp_contract": f"{AUDIT_DAPP}.KYC",
+        "cft_dapp_contract": f"{AUDIT_DAPP}.CFT",
     }
 
 
@@ -234,13 +234,11 @@ def cc_dapp(client, deployer):
 
 
 @pytest.fixture(scope="module")
-def env(client, deployer, regulator,
+def env(client, regulator,
         user_approved, user_blocked, user_cft_kyc, user_plain,
         audit_dapp, cc_dapp):
-    """Wire up regulation: register, bind, approve and sanction."""
+    """Wire up regulation using test-local audit implementations."""
     proxy_cid = audit_dapp["proxy_cid"]
-    kyc_cid = audit_dapp["kyc_cid"]
-    cft_cid = audit_dapp["cft_cid"]
     kyc_dc = audit_dapp["kyc_dapp_contract"]
     cft_dc = audit_dapp["cft_dapp_contract"]
     ct_dc = cc_dapp["ct_dapp_contract"]
@@ -262,14 +260,14 @@ def env(client, deployer, regulator,
 
     tx = client.regulation_call_audit_proxy(
         regulator, "core.AuditProxy.register",
-        {"audit_dc": kyc_dc, "cid": kyc_cid},
+        {"audit_dc": kyc_dc, "cid": audit_dapp["kyc_cid"]},
         sync=True)
     assert tx is not None, "regulation_call_audit_proxy register(kyc) tx returned None"
     _assert_relay_success(tx, "register(kyc)")
 
     tx = client.regulation_call_audit_proxy(
         regulator, "core.AuditProxy.register",
-        {"audit_dc": cft_dc, "cid": cft_cid},
+        {"audit_dc": cft_dc, "cid": audit_dapp["cft_cid"]},
         sync=True)
     assert tx is not None, "regulation_call_audit_proxy register(cft) tx returned None"
     _assert_relay_success(tx, "register(cft)")
@@ -289,22 +287,22 @@ def env(client, deployer, regulator,
     _assert_relay_success(tx, "bind(kyc->app)")
 
     tx = client.send_transaction(
-        deployer, f"{AUDIT_DAPP}.KycAudit.approve",
+        audit_dapp["owner"], audit_dapp["kyc_dapp_contract"] + ".approve",
         {"addr": user_approved.address}, is_sync=True)
     _assert_relay_success(tx, "kyc.approve(user_approved)")
 
     tx = client.send_transaction(
-        deployer, f"{AUDIT_DAPP}.KycAudit.approve",
+        audit_dapp["owner"], audit_dapp["kyc_dapp_contract"] + ".approve",
         {"addr": user_cft_kyc.address}, is_sync=True)
     _assert_relay_success(tx, "kyc.approve(user_cft_kyc)")
 
     tx = client.send_transaction(
-        deployer, f"{AUDIT_DAPP}.CftAudit.add_sanction",
+        audit_dapp["owner"], audit_dapp["cft_dapp_contract"] + ".add_sanction",
         {"addr": user_blocked.address}, is_sync=True)
     _assert_relay_success(tx, "cft.add_sanction(user_blocked)")
 
     tx = client.send_transaction(
-        deployer, f"{AUDIT_DAPP}.CftAudit.add_sanction",
+        audit_dapp["owner"], audit_dapp["cft_dapp_contract"] + ".add_sanction",
         {"addr": user_cft_kyc.address}, is_sync=True)
     _assert_relay_success(tx, "cft.add_sanction(user_cft_kyc)")
 
