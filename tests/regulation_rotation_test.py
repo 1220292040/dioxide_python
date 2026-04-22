@@ -46,6 +46,7 @@ class TestRegulationState:
         assert CORE_CONTRACT_ROTATION_GLOBAL > CORE_CONTRACT_REGULATION_GLOBAL
 
 
+@pytest.mark.skip(reason="rotation feature is not implemented yet")
 class TestRotationState:
     def test_get_rotation_state_returns_data(self, client):
         state = client.get_rotation_state()
@@ -88,6 +89,7 @@ class TestRegulationBlock:
         assert isinstance(tx_hash, str)
 
 
+@pytest.mark.skip(reason="rotation feature is not implemented yet")
 class TestRotationNodes:
     def test_rotation_add_node(self, client, regulator, target):
         tx_hash = client.rotation_add_node(

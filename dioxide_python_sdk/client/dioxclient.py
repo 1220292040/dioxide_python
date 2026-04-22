@@ -538,7 +538,7 @@ class DioxClient:
         Deploy transaction hash.
     """
     @exception_handler
-    def deploy_contract(self,dapp_name,delegator:DioxAccount,file_path=None,source_code=None,construct_args:dict=None,compile_time=None):
+    def deploy_contract(self,dapp_name,delegator:DioxAccount,file_path=None,source_code=None,construct_args:dict=None,compile_time=None,timeout=None):
         deploy_args={}
         if file_path is not None:
             with open(file_path, encoding='utf-8', errors='replace') as f:
@@ -563,7 +563,11 @@ class DioxClient:
             is_delegatee=True
         )
         tx_hash = self.send_raw_transaction(delegator.sign_diox_transaction(deployed_txn),True)
-        self.wait_for_deploy(tx_hash)
+        deploy_timeout = timeout if timeout is not None else max(
+            DEFAULT_TIMEOUT,
+            (compile_time or 0) * 6
+        )
+        self.wait_for_deploy(tx_hash, deploy_timeout)
         return tx_hash
 
     """
@@ -578,7 +582,7 @@ class DioxClient:
         Deploy transaction hash.
     """
     @exception_handler
-    def deploy_contracts(self,dapp_name,delegator:DioxAccount,contracts:dict[str,dict]=None,compile_time=None):
+    def deploy_contracts(self,dapp_name,delegator:DioxAccount,contracts:dict[str,dict]=None,compile_time=None,timeout=None):
         deploy_args={}
         codes = []
         cargs = []
@@ -614,11 +618,15 @@ class DioxClient:
             is_delegatee=True
         )
         tx_hash = self.send_raw_transaction(delegator.sign_diox_transaction(deployed_txn),True)
-        self.wait_for_deploy(tx_hash)
+        deploy_timeout = timeout if timeout is not None else max(
+            DEFAULT_TIMEOUT,
+            (compile_time or 0) * 6
+        )
+        self.wait_for_deploy(tx_hash, deploy_timeout)
         return tx_hash
 
     @exception_handler
-    def wait_for_deploy(self,deploy_hash):
+    def wait_for_deploy(self, deploy_hash, timeout=DEFAULT_TIMEOUT):
         state = self.get_contract_state("core","contracts",Scope.Global,None).State
         target_height = -1
         if state is not None and state != {}:
@@ -626,9 +634,17 @@ class DioxClient:
                 if s.BuildKey == deploy_hash:
                     target_height = s.TargetHeight
                     break
+        if target_height < 0:
+            raise DioxError(-10005, "deploy not found in scheduled contracts")
         base = cur_height = self.get_block_number()
+        deadline = time.time() + timeout
         while cur_height <= target_height:
             progress_bar(cur_height-base,target_height-base,title="Deploy Process: ")
+            if time.time() > deadline:
+                raise DioxError(
+                    -10006,
+                    "deploy timeout waiting for target height {}".format(target_height)
+                )
             cur_height = self.get_block_number()
             time.sleep(0.5)
         print("\nDeploy finish.")
