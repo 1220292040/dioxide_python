@@ -31,10 +31,6 @@ REG_CONTRACTS_DIR = os.path.abspath(
     os.path.join(BASE_DIR, "..", "..", "..", "oxd_bc", "src", "rvm", "contracts", "regulation")
 )
 
-_SUFFIX = uuid.uuid4().hex[:4]
-AUDIT_DAPP = f"F7CC{_SUFFIX}"
-CC_DAPP = f"CC{_SUFFIX}"
-
 REGULATOR_KEY_B64 = "6NHi+B1jWQ3gDfC2GFHHBoNPEhCWa9lkIUMGRtRc2LbYtNrHang1QL/XdXt0pSAVw0v4cX7iDz55Ksnf41cIfA=="
 
 DUMMY_DOMAIN = [100, 105, 111, 120, 48, 49]
@@ -69,6 +65,20 @@ def _send_tx(client, user, function, args, timeout=60):
             if hasattr(r, "Invocation") and r.Invocation.Status != "IVKRET_SUCCESS":
                 return tx_hash, False
     return tx_hash, ok
+
+
+def _create_unique_dapp(client, owner, prefix, deposit, attempts=8, suffix_len=4):
+    """Create a unique test dapp on a persistent chain."""
+    last_result = None
+    for _ in range(attempts):
+        dapp_name = f"{prefix}{uuid.uuid4().hex[:suffix_len]}"
+        tx_hash, ok = client.create_dapp(owner, dapp_name, deposit)
+        if ok:
+            return dapp_name, tx_hash
+        last_result = (dapp_name, tx_hash)
+    raise AssertionError(
+        f"Failed to create unique dapp with prefix {prefix}; last result: {last_result}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -136,22 +146,22 @@ def audit_dapp(client):
     owner = DioxAccount.generate_key_pair()
     client.mint_dio(owner, 10**18)
 
-    _, ok = client.create_dapp(owner, AUDIT_DAPP, 10**12)
-    assert ok, f"Failed to create audit dapp {AUDIT_DAPP}"
+    audit_dapp_name, _ = _create_unique_dapp(client, owner, "F7CC", 10**12)
 
     contracts = {
         os.path.join(REG_CONTRACTS_DIR, "kyc.prd"): None,
         os.path.join(REG_CONTRACTS_DIR, "cft.prd"): None,
     }
-    tx = client.deploy_contracts(AUDIT_DAPP, owner, contracts, compile_time=20)
+    tx = client.deploy_contracts(audit_dapp_name, owner, contracts, compile_time=20)
     assert tx is not None, "Audit contracts deploy failed"
 
-    kyc_info = client.get_contract_info(AUDIT_DAPP, "KYC")
-    cft_info = client.get_contract_info(AUDIT_DAPP, "CFT")
+    kyc_info = client.get_contract_info(audit_dapp_name, "KYC")
+    cft_info = client.get_contract_info(audit_dapp_name, "CFT")
     regulation_state = client.get_regulation_state()
     assert int(regulation_state.State.AuditContractIdRaw) == int(proxy_info.ContractID)
 
     return {
+        "name": audit_dapp_name,
         "owner": owner,
         "proxy_cid": proxy_info.ContractID,
         "proxy_cvid": proxy_info.ContractVersionID,
@@ -159,16 +169,15 @@ def audit_dapp(client):
         "kyc_cvid": kyc_info.ContractVersionID,
         "cft_cid": cft_info.ContractID,
         "cft_cvid": cft_info.ContractVersionID,
-        "kyc_dapp_contract": f"{AUDIT_DAPP}.KYC",
-        "cft_dapp_contract": f"{AUDIT_DAPP}.CFT",
+        "kyc_dapp_contract": f"{audit_dapp_name}.KYC",
+        "cft_dapp_contract": f"{audit_dapp_name}.CFT",
     }
 
 
 @pytest.fixture(scope="module")
 def cc_dapp(client, deployer):
     """Deploy cross-chain DApp with all GCL contracts and set up SDP bindings."""
-    _, ok = client.create_dapp(deployer, CC_DAPP, 10**12)
-    assert ok, f"Failed to create crosschain dapp {CC_DAPP}"
+    cc_dapp_name, _ = _create_unique_dapp(client, deployer, "CC", 10**12)
 
     iface_dir = os.path.join(CROSSCHAIN_DIR, "interfaces")
     lib_dir = os.path.join(CROSSCHAIN_DIR, "lib")
@@ -192,13 +201,13 @@ def cc_dapp(client, deployer):
         os.path.join(CROSSCHAIN_DIR, "CrossTransfer.gcl"): {"_owner": deployer.address},
         os.path.join(CROSSCHAIN_DIR, "AppContract.gcl"): {"_owner": deployer.address},
     }
-    tx = client.deploy_contracts(CC_DAPP, deployer, contracts, compile_time=30)
+    tx = client.deploy_contracts(cc_dapp_name, deployer, contracts, compile_time=30)
     assert tx is not None, "Cross-chain contracts deploy failed"
 
-    am_info = client.get_contract_info(CC_DAPP, "AuthMsg")
-    sdp_info = client.get_contract_info(CC_DAPP, "SDPMsg")
-    ct_info = client.get_contract_info(CC_DAPP, "CrossTransfer")
-    app_info = client.get_contract_info(CC_DAPP, "AppContract")
+    am_info = client.get_contract_info(cc_dapp_name, "AuthMsg")
+    sdp_info = client.get_contract_info(cc_dapp_name, "SDPMsg")
+    ct_info = client.get_contract_info(cc_dapp_name, "CrossTransfer")
+    app_info = client.get_contract_info(cc_dapp_name, "AppContract")
 
     am_cvid = am_info.ContractVersionID
     sdp_cvid = sdp_info.ContractVersionID
@@ -206,30 +215,31 @@ def cc_dapp(client, deployer):
     am_addr = f"0x{am_cvid:016X}:contract"
 
     client.send_transaction(
-        deployer, f"{CC_DAPP}.SDPMsg.setAmContract",
+        deployer, f"{cc_dapp_name}.SDPMsg.setAmContract",
         {"_amContractId": am_cvid, "_amAddress": am_addr}, is_sync=True)
     client.send_transaction(
-        deployer, f"{CC_DAPP}.SDPMsg.setLocalDomain",
+        deployer, f"{cc_dapp_name}.SDPMsg.setLocalDomain",
         {"domain": DUMMY_DOMAIN}, is_sync=True)
     client.send_transaction(
-        deployer, f"{CC_DAPP}.AuthMsg.setProtocol",
+        deployer, f"{cc_dapp_name}.AuthMsg.setProtocol",
         {"protocolID": sdp_cvid, "protocolAddress": sdp_addr, "protocolType": 0},
         is_sync=True)
     client.send_transaction(
-        deployer, f"{CC_DAPP}.CrossTransfer.setProtocol",
+        deployer, f"{cc_dapp_name}.CrossTransfer.setProtocol",
         {"_protocolContractId": sdp_cvid, "_protocolAddress": sdp_addr},
         is_sync=True)
     client.send_transaction(
-        deployer, f"{CC_DAPP}.AppContract.setProtocol",
+        deployer, f"{cc_dapp_name}.AppContract.setProtocol",
         {"_protocolContractId": sdp_cvid, "_protocolAddress": sdp_addr},
         is_sync=True)
 
     return {
+        "name": cc_dapp_name,
         "ct_cid": ct_info.ContractID,
         "ct_cvid": ct_info.ContractVersionID,
         "app_cid": app_info.ContractID,
-        "ct_dapp_contract": f"{CC_DAPP}.CrossTransfer",
-        "app_dapp_contract": f"{CC_DAPP}.AppContract",
+        "ct_dapp_contract": f"{cc_dapp_name}.CrossTransfer",
+        "app_dapp_contract": f"{cc_dapp_name}.AppContract",
     }
 
 
@@ -308,7 +318,7 @@ def env(client, regulator,
 
     time.sleep(2)
 
-    return {"ct_dc": ct_dc, "app_dc": app_dc}
+    return {"cc_dapp_name": cc_dapp["name"], "ct_dc": ct_dc, "app_dc": app_dc}
 
 
 # ---------------------------------------------------------------------------
@@ -320,7 +330,7 @@ class TestCC1KycAuditAppContract:
     def test_unapproved_user_rejected(self, client, user_blocked, env):
         _, ok = _send_tx(
             client, user_blocked,
-            f"{CC_DAPP}.AppContract.sendUnorderedMessage",
+            f"{env['cc_dapp_name']}.AppContract.sendUnorderedMessage",
             {"receiverDomain": DUMMY_DOMAIN, "receiver": DUMMY_RECEIVER,
              "message": DUMMY_MESSAGE})
         assert not ok, "Unapproved user should be rejected by KYC on AppContract"
@@ -328,7 +338,7 @@ class TestCC1KycAuditAppContract:
     def test_approved_user_allowed(self, client, user_approved, env):
         _, ok = _send_tx(
             client, user_approved,
-            f"{CC_DAPP}.AppContract.sendUnorderedMessage",
+            f"{env['cc_dapp_name']}.AppContract.sendUnorderedMessage",
             {"receiverDomain": DUMMY_DOMAIN, "receiver": DUMMY_RECEIVER,
              "message": DUMMY_MESSAGE})
         assert ok, "KYC-approved user should succeed on AppContract"
@@ -343,19 +353,19 @@ class TestCC2CftAuditCrossTransfer:
     def test_sanctioned_user_rejected_faucet(self, client, user_blocked, env):
         _, ok = _send_tx(
             client, user_blocked,
-            f"{CC_DAPP}.CrossTransfer.faucet", {})
+            f"{env['cc_dapp_name']}.CrossTransfer.faucet", {})
         assert not ok, "CFT-sanctioned user should be rejected on CrossTransfer.faucet"
 
     def test_clean_user_allowed_faucet(self, client, user_approved, env):
         _, ok = _send_tx(
             client, user_approved,
-            f"{CC_DAPP}.CrossTransfer.faucet", {})
+            f"{env['cc_dapp_name']}.CrossTransfer.faucet", {})
         assert ok, "Non-sanctioned user should succeed on CrossTransfer.faucet"
 
     def test_clean_user_allowed_cross_transfer(self, client, user_approved, env):
         _, ok = _send_tx(
             client, user_approved,
-            f"{CC_DAPP}.CrossTransfer.crossTransfer",
+            f"{env['cc_dapp_name']}.CrossTransfer.crossTransfer",
             {"receiverDomain": DUMMY_DOMAIN, "receiver": DUMMY_RECEIVER,
              "amount": 100})
         assert ok, "Non-sanctioned user should succeed on CrossTransfer.crossTransfer"
@@ -373,7 +383,7 @@ class TestCC4BindingIsolation:
         -> should PASS because AppContract only checks KYC."""
         _, ok = _send_tx(
             client, user_cft_kyc,
-            f"{CC_DAPP}.AppContract.sendUnorderedMessage",
+            f"{env['cc_dapp_name']}.AppContract.sendUnorderedMessage",
             {"receiverDomain": DUMMY_DOMAIN, "receiver": DUMMY_RECEIVER,
              "message": DUMMY_MESSAGE})
         assert ok, (
@@ -386,7 +396,7 @@ class TestCC4BindingIsolation:
         -> should PASS because CrossTransfer only checks CFT."""
         _, ok = _send_tx(
             client, user_plain,
-            f"{CC_DAPP}.CrossTransfer.faucet", {})
+            f"{env['cc_dapp_name']}.CrossTransfer.faucet", {})
         assert ok, (
             "Non-KYC user without CFT sanction should pass "
             "CrossTransfer (CFT-only binding)")
@@ -407,7 +417,7 @@ class TestCC3UnbindRestoresAccess:
             sync=True)
         _, ok = _send_tx(
             client, user_blocked,
-            f"{CC_DAPP}.CrossTransfer.faucet", {})
+            f"{env['cc_dapp_name']}.CrossTransfer.faucet", {})
         assert ok, (
             "After unbinding CFT, sanctioned user should succeed "
             "on CrossTransfer")
@@ -421,7 +431,7 @@ class TestCC3UnbindRestoresAccess:
             sync=True)
         _, ok = _send_tx(
             client, user_blocked,
-            f"{CC_DAPP}.AppContract.sendUnorderedMessage",
+            f"{env['cc_dapp_name']}.AppContract.sendUnorderedMessage",
             {"receiverDomain": DUMMY_DOMAIN, "receiver": DUMMY_RECEIVER,
              "message": DUMMY_MESSAGE})
         assert ok, (
