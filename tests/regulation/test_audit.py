@@ -37,7 +37,7 @@ class TestAudit:
         )
         # Approve deployer for KYC
         tx = client.send_transaction(
-            deployer, f"{kyc_dc.split('.')[0]}.KycAudit.approve",
+            deployer, f"{kyc_dc.split('.')[0]}.KYC.approve",
             {"addr": deployer.address}, is_sync=True,
         )
         assert tx is not None
