@@ -4,7 +4,7 @@ import pytest
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from dioxide_python_sdk.client.dioxclient import DioxClient, AuditProxyResult
+from dioxide_python_sdk.client.dioxclient import DioxClient
 from dioxide_python_sdk.client.account import DioxAccount
 from dioxide_python_sdk.client.contract import (
     CORE_CONTRACT_REGULATION_GLOBAL,
@@ -70,53 +70,3 @@ class TestRegulationBlock:
         )
         assert tx_hash is not None
         assert isinstance(tx_hash, str)
-
-
-@pytest.mark.skip(reason="depends on F7 audit-proxy refactor; enable after C++/PRD landed")
-class TestRegulationAuditProxy:
-    """Regulation audit management API tests.
-
-    These tests verify that the SDK composes requests against the new
-    `core.regulation.*` audit management surface instead of direct
-    `core.AuditProxy.*` calls.
-    """
-
-    def test_regulation_call_audit_proxy_register(self, client, regulator):
-        result = client.regulation_call_audit_proxy(
-            regulator=regulator,
-            function_name="core.AuditProxy.register",
-            args={"audit_dc": "dappA.kyc", "cid": 0},
-            sync=True,
-        )
-        assert isinstance(result, AuditProxyResult)
-        assert result.tx_hash is not None
-
-    def test_regulation_call_audit_proxy_bind(self, client, regulator):
-        result = client.regulation_call_audit_proxy(
-            regulator=regulator,
-            function_name="core.AuditProxy.bind",
-            args={"target_dc": "appA.token", "audit_dc": "dappA.kyc"},
-            sync=True,
-        )
-        assert isinstance(result, AuditProxyResult)
-        assert result.tx_hash is not None
-
-    def test_regulation_call_audit_proxy_unbind(self, client, regulator):
-        result = client.regulation_call_audit_proxy(
-            regulator=regulator,
-            function_name="core.AuditProxy.unbind",
-            args={"target_dc": "appA.token", "audit_dc": "dappA.kyc"},
-            sync=True,
-        )
-        assert isinstance(result, AuditProxyResult)
-        assert result.tx_hash is not None
-
-    def test_regulation_call_audit_proxy_unregister(self, client, regulator):
-        result = client.regulation_call_audit_proxy(
-            regulator=regulator,
-            function_name="core.AuditProxy.unregister",
-            args={"audit_dc": "dappA.kyc"},
-            sync=True,
-        )
-        assert isinstance(result, AuditProxyResult)
-        assert result.tx_hash is not None
