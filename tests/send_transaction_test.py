@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, ".")
 
 from dioxide_python_sdk.client.dioxclient import DioxClient
+from dioxide_python_sdk.client.account import DioxAddress, DioxAddressType
 
 
 class TestGetTransactionGroupRelayHash(unittest.TestCase):
@@ -97,6 +98,145 @@ class TestRegulationAuditProxyCalls(unittest.TestCase):
                 args={"check_name": "kyc", "impl_cid": 7},
                 sync=False,
             )
+
+    @patch.object(DioxClient, "get_contract_info")
+    @patch.object(DioxClient, "regulation_call_audit_proxy")
+    def test_register_audit_auto_queries_cid_and_delegates_to_regulation_call_audit_proxy(
+        self, mock_call, mock_get_contract_info
+    ):
+        regulator = MagicMock()
+        contract_info = MagicMock()
+        contract_info.ContractID = 7
+        mock_get_contract_info.return_value = contract_info
+        self.client.register_audit(
+            regulator=regulator,
+            audit_dc="audit.KYC",
+            sync=False,
+        )
+        mock_get_contract_info.assert_called_once_with("audit", "KYC")
+        mock_call.assert_called_once_with(
+            regulator=regulator,
+            function_name="core.AuditProxy.register",
+            args={"audit_dc": "audit.KYC", "cid": 7},
+            sync=False,
+            timeout=60,
+        )
+
+    @patch.object(DioxClient, "regulation_call_audit_proxy")
+    def test_register_audit_uses_explicit_cid_when_provided(self, mock_call):
+        regulator = MagicMock()
+        self.client.register_audit(
+            regulator=regulator,
+            audit_dc="audit.KYC",
+            cid=9,
+            sync=False,
+        )
+        mock_call.assert_called_once_with(
+            regulator=regulator,
+            function_name="core.AuditProxy.register",
+            args={"audit_dc": "audit.KYC", "cid": 9},
+            sync=False,
+            timeout=60,
+        )
+
+    @patch.object(DioxClient, "regulation_call_audit_proxy")
+    def test_unregister_audit_delegates_to_regulation_call_audit_proxy(self, mock_call):
+        regulator = MagicMock()
+        self.client.unregister_audit(
+            regulator=regulator,
+            audit_dc="audit.KYC",
+            sync=False,
+        )
+        mock_call.assert_called_once_with(
+            regulator=regulator,
+            function_name="core.AuditProxy.unregister",
+            args={"audit_dc": "audit.KYC"},
+            sync=False,
+            timeout=60,
+        )
+
+    @patch.object(DioxClient, "regulation_call_audit_proxy")
+    def test_bind_audit_delegates_to_regulation_call_audit_proxy(self, mock_call):
+        regulator = MagicMock()
+        self.client.bind_audit(
+            regulator=regulator,
+            target_dc="app.Token",
+            audit_dc="audit.KYC",
+            sync=False,
+        )
+        mock_call.assert_called_once_with(
+            regulator=regulator,
+            function_name="core.AuditProxy.bind",
+            args={"target_dc": "app.Token", "audit_dc": "audit.KYC"},
+            sync=False,
+            timeout=60,
+        )
+
+    @patch.object(DioxClient, "regulation_call_audit_proxy")
+    def test_unbind_audit_delegates_to_regulation_call_audit_proxy(self, mock_call):
+        regulator = MagicMock()
+        self.client.unbind_audit(
+            regulator=regulator,
+            target_dc="app.Token",
+            audit_dc="audit.KYC",
+            sync=False,
+        )
+        mock_call.assert_called_once_with(
+            regulator=regulator,
+            function_name="core.AuditProxy.unbind",
+            args={"target_dc": "app.Token", "audit_dc": "audit.KYC"},
+            sync=False,
+            timeout=60,
+        )
+
+
+class TestDeployTimeoutPropagation(unittest.TestCase):
+    def setUp(self):
+        self.client = DioxClient()
+
+    @patch.object(DioxClient, "wait_for_deploy")
+    @patch.object(DioxClient, "send_raw_transaction")
+    @patch.object(DioxClient, "compose_transaction")
+    def test_deploy_contracts_uses_extended_timeout_for_send_and_wait(
+        self, mock_compose, mock_send_raw, mock_wait_for_deploy
+    ):
+        delegator = MagicMock()
+        delegator.sign_diox_transaction.return_value = b"signed"
+        mock_compose.return_value = b"unsigned"
+        mock_send_raw.return_value = "txhash"
+
+        with patch("builtins.open", unittest.mock.mock_open(read_data="contract Demo {}")):
+            self.client.deploy_contracts(
+                dapp_name="testa",
+                delegator=delegator,
+                contracts={"demo.gcl": None},
+                compile_time=20,
+            )
+
+        expected_timeout = 120
+        mock_send_raw.assert_called_once_with(b"signed", True, expected_timeout)
+        mock_wait_for_deploy.assert_called_once_with("txhash", expected_timeout)
+
+    @patch.object(DioxClient, "wait_for_deploy")
+    @patch.object(DioxClient, "send_raw_transaction")
+    @patch.object(DioxClient, "compose_transaction")
+    def test_deploy_contract_uses_explicit_timeout_for_send_and_wait(
+        self, mock_compose, mock_send_raw, mock_wait_for_deploy
+    ):
+        delegator = MagicMock()
+        delegator.sign_diox_transaction.return_value = b"signed"
+        mock_compose.return_value = b"unsigned"
+        mock_send_raw.return_value = "txhash"
+
+        self.client.deploy_contract(
+            dapp_name="testa",
+            delegator=delegator,
+            source_code="contract Demo {}",
+            timeout=180,
+        )
+
+        mock_send_raw.assert_called_once_with(b"signed", True, 180)
+        mock_wait_for_deploy.assert_called_once_with("txhash", 180)
 
 
 if __name__ == "__main__":
