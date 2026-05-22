@@ -1,0 +1,180 @@
+import SDPLib;
+import IAuthMessage;
+import IContractUsingSDP;
+import ISDPMessage;
+import ISubProtocol;
+import Utils;
+
+contract SDPMsg implements ISDPMessage.SDPMessageInterface, ISubProtocol.SubProtocolInterface {
+
+    @global address owner;
+
+    @global uint64 amContractId;
+    @global address amAddress;
+    @global array<uint8> localDomain;
+
+    @global map<hash, uint32> sendSeq;
+    @global map<hash, uint32> recvSeq;
+
+    @address uint32 resultInQuerySDPMessageSeq;
+
+    @global SDPLib.SDPMessage decodedSdpMsg;
+
+    const uint32 UNORDERED_SEQUENCE = 0xffffffffu32;
+
+    // @notice only for orderred msg
+    const uint64 MAX_NONCE = 0xffffffffffffffffu64;
+
+    @global function on_deploy(address _owner) {
+        owner = _owner;
+        __debug.print("[on_deploy] SDPMsg deployed - address:", __address(), " id:", __id());
+    }
+
+    @address function setAmContract(uint64 _amContractId, address _amAddress) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^_amContractId, ^_amAddress) {
+            amContractId = _amContractId;
+            amAddress = _amAddress;
+            __debug.print("[setAmContract] AM Contract reconfigured - contractId: ", amContractId, " address: ", amAddress);
+        }
+    }
+
+    @address function setLocalDomain(array<uint8> domain) public export {
+        __debug.assert(__transaction.get_sender() == owner);
+        relay@global (^domain) {
+            localDomain = domain;
+            __debug.print("setLocalDomain: ", localDomain);
+        }
+    }
+
+    // notice: in GCL, receiverID is converted from uint64 to bytes32
+    @address function sendMessage(array<uint8> receiverDomain, array<uint8> receiverID, array<uint8> message, uint64 senderID) public export {
+        SDPLib.SDPMessage sdpMessage;
+        sdpMessage.receiverDomain = Utils.bytesCopy(receiverDomain);
+        sdpMessage.receiver = Utils.bytesCopy(receiverID);
+        sdpMessage.message = Utils.bytesCopy(message);
+        sdpMessage.sequence = _getAndUpdateSendSeq(receiverDomain, senderID, receiverID);
+
+        array<uint8> rawMsg = SDPLib.encodeSDPMsgV1(sdpMessage);
+        __debug.print("[sendMessage] rawMsg: ", rawMsg);
+
+        relay@global (^senderID, ^rawMsg) {
+            IAuthMessage.AuthMessageInterface am = IAuthMessage.AuthMessageInterface(amContractId);
+            am.recvFromProtocol(senderID, rawMsg);
+        }
+    }
+
+    // notice: in GCL, receiverID is converted from uint64 to bytes32
+    @address function sendUnorderedMessage(array<uint8> receiverDomain, array<uint8> receiverID, array<uint8> message, uint64 senderID) public export {
+        SDPLib.SDPMessage sdpMessage;
+        sdpMessage.receiverDomain = Utils.bytesCopy(receiverDomain);
+        sdpMessage.receiver = Utils.bytesCopy(receiverID);
+        sdpMessage.message = Utils.bytesCopy(message);
+        sdpMessage.sequence = UNORDERED_SEQUENCE;
+
+        array<uint8> rawMsg = SDPLib.encodeSDPMsgV1(sdpMessage);
+        __debug.print("[sendUnorderedMessage] rawMsg: ", rawMsg);
+
+        relay@global (^senderID, ^rawMsg) {
+            IAuthMessage.AuthMessageInterface am = IAuthMessage.AuthMessageInterface(amContractId);
+            am.recvFromProtocol(senderID, rawMsg);
+        }
+    }
+
+    @global function recvMessage(array<uint8> senderDomain, array<uint8> senderID, array<uint8> pkg) public export {
+        __debug.assert(__transaction.get_sender() == amAddress);
+        // only SDPv1 now
+        // uint32 version = SDPLib.getSDPVersionFrom(pkg);
+        _processSDPv1(senderDomain, senderID, pkg);
+    }
+
+    @global function _processSDPv1(array<uint8> senderDomain, array<uint8> senderID, array<uint8> pkg) public {
+        SDPLib.SDPMessage sdpMessage = SDPLib.decodeSDPMsgV1(pkg);
+        __debug.print("sdpMessage: ", sdpMessage);
+
+        decodedSdpMsg = sdpMessage;
+
+        __debug.assert(Utils.bytesEqual(sdpMessage.receiverDomain, localDomain));
+
+        if (sdpMessage.sequence == UNORDERED_SEQUENCE) {
+            _routeUnorderedMessage(senderDomain, senderID, sdpMessage);
+        } else {
+            _routeOrderedMessage(senderDomain, senderID, sdpMessage);
+        }
+
+        relay@external recvMessageInProtocol(senderDomain, senderID, pkg);
+    }
+
+    @global function _routeUnorderedMessage(array<uint8> senderDomain, array<uint8> senderID, SDPLib.SDPMessage sdpMessage) public {
+        // 从 receiver bytes 中获取接收合约的地址
+        uint64 receiverID = uint64(Utils.bytes32ToUint256(sdpMessage.receiver));
+        __debug.print("[_routeUnorderedMessage] receiverID: ", receiverID);
+        __debug.print("[_routeUnorderedMessage] senderDomain: ", senderDomain);
+        __debug.print("[_routeUnorderedMessage] senderID: ", senderID);
+        __debug.print("[_routeUnorderedMessage] message: ", sdpMessage.message);
+
+        // 调用接收合约的 recvUnorderedMessage
+        IContractUsingSDP.ContractUsingSDPInterface dapp = IContractUsingSDP.ContractUsingSDPInterface(receiverID);
+        dapp.recvUnorderedMessage(senderDomain, senderID, sdpMessage.message);
+    }
+
+    @global function _routeOrderedMessage(array<uint8> senderDomain, array<uint8> senderID, SDPLib.SDPMessage sdpMessage) public {
+        uint32 seqExpected = _getAndUpdateRecvSeq(senderDomain, senderID, sdpMessage.receiver);
+        __debug.assert(sdpMessage.sequence == seqExpected);
+
+        uint64 receiverID = uint64(Utils.bytes32ToUint256(sdpMessage.receiver));
+        __debug.print("[_routeOrderedMessage] receiverID: ", receiverID);
+        __debug.print("[_routeOrderedMessage] senderDomain: ", senderDomain);
+        __debug.print("[_routeOrderedMessage] senderID: ", senderID);
+        __debug.print("[_routeOrderedMessage] message: ", sdpMessage.message);
+
+        // 调用接收合约的 recvMessage
+        IContractUsingSDP.ContractUsingSDPInterface dapp = IContractUsingSDP.ContractUsingSDPInterface(receiverID);
+        dapp.recvMessage(senderDomain, senderID, sdpMessage.message);
+    }
+
+
+    @global function address getAmAddress() export const {
+        return amAddress;
+    }
+
+    @global function array<uint8> getLocalDomain() export const {
+        array<uint8> result;
+        for (uint32 i = 0u32; i < localDomain.length(); i++) {
+            result.push(localDomain[i]);
+        }
+        return result;
+    }
+
+    @address function uint32 querySDPMessageSeq(array<uint8> senderDomain, array<uint8> senderID, array<uint8> receiverDomain, array<uint8> receiverID) export {
+        relay@global (^receiverDomain) {
+            __debug.assert(Utils.bytesEqual(receiverDomain, localDomain));
+        }
+        hash seqKey = SDPLib.getReceivingSeqID(senderDomain, senderID, receiverID);
+        
+        uint32 seq;
+        relay@global (^seqKey, ^seq) {
+            seq = recvSeq[seqKey];
+        }
+        resultInQuerySDPMessageSeq = seq;
+        return seq;
+    }
+
+    @address function uint32 _getAndUpdateSendSeq(array<uint8> receiverDomain, uint64 senderID, array<uint8> receiver) public {
+        hash seqKey = SDPLib.getSendingSeqID(receiverDomain, senderID, receiver);
+        uint32 seq;
+        relay@global (^seqKey, ^seq) {
+            seq = sendSeq[seqKey];
+            sendSeq[seqKey]++;
+        }
+        return seq;
+    }
+
+    @global function uint32 _getAndUpdateRecvSeq(array<uint8> senderDomain, array<uint8> sender, array<uint8> receiver) public {
+        hash seqKey = SDPLib.getReceivingSeqID(senderDomain, sender, receiver);
+        uint32 seq = recvSeq[seqKey];
+        recvSeq[seqKey]++;
+        return seq;
+    }
+
+}

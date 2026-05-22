@@ -123,7 +123,7 @@ class TestSubscribe:
             print(f"Height filter test: Received {len(received_blocks)} blocks")
             
         except Exception as e:
-            pytest.skip(f"Chain not available or too slow: {e}")
+            pytest.fail(f"Chain not available or too slow: {e}")
     
     @pytest.mark.skip(reason="Manual test - requires specific dapp deployment")
     def test_subscribe_state_with_dapp(self, client):
@@ -165,4 +165,3 @@ if __name__ == "__main__":
         pass
     
     print(f"Received {len(received)} blocks in {time.time() - start:.2f} seconds")
-

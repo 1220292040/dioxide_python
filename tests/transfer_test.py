@@ -2,7 +2,6 @@
 Transfer test cases.
 """
 
-import pytest
 from dioxide_python_sdk.client.dioxclient import DioxClient
 from dioxide_python_sdk.client.account import DioxAccount
 

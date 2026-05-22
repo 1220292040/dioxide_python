@@ -27,9 +27,12 @@ from ..client.handlers import (
     default_contract_statekey_state_handler
 )
 from box import Box  # type: ignore
+from dataclasses import dataclass
 from . import types as dioxtypes
+from ..utils.serializer import deserialize
 import queue
 import base64
+import hashlib
 import time
 import json
 from ..client.contract import Scope
@@ -38,6 +41,10 @@ import threading
 import websockets  # type: ignore
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
+try:
+    import krock32  # type: ignore
+except ImportError:
+    krock32 = None
 
 
 DEFAULT_TIMEOUT = 60
@@ -50,6 +57,12 @@ class DioxError(Exception):
         self.message = m
     def info(self):
         return "code :{},message : {}".format(self.code, self.message)
+
+@dataclass
+class AuditProxyResult:
+    ok: bool
+    msg: str
+    tx_hash: str | None
 
 #-----------------------------------------------------------------------------------------------------
 class DioxClient:
@@ -525,7 +538,7 @@ class DioxClient:
         Deploy transaction hash.
     """
     @exception_handler
-    def deploy_contract(self,dapp_name,delegator:DioxAccount,file_path=None,source_code=None,construct_args:dict=None,compile_time=None):
+    def deploy_contract(self,dapp_name,delegator:DioxAccount,file_path=None,source_code=None,construct_args:dict=None,compile_time=None,timeout=None):
         deploy_args={}
         if file_path is not None:
             with open(file_path, encoding='utf-8', errors='replace') as f:
@@ -549,8 +562,16 @@ class DioxClient:
             args=deploy_args,
             is_delegatee=True
         )
-        tx_hash = self.send_raw_transaction(delegator.sign_diox_transaction(deployed_txn),True)
-        self.wait_for_deploy(tx_hash)
+        deploy_timeout = timeout if timeout is not None else max(
+            DEFAULT_TIMEOUT,
+            (compile_time or 0) * 6
+        )
+        tx_hash = self.send_raw_transaction(
+            delegator.sign_diox_transaction(deployed_txn),
+            True,
+            deploy_timeout,
+        )
+        self.wait_for_deploy(tx_hash, deploy_timeout)
         return tx_hash
 
     """
@@ -565,7 +586,7 @@ class DioxClient:
         Deploy transaction hash.
     """
     @exception_handler
-    def deploy_contracts(self,dapp_name,delegator:DioxAccount,contracts:dict[str,dict]=None,compile_time=None):
+    def deploy_contracts(self,dapp_name,delegator:DioxAccount,contracts:dict[str,dict]=None,compile_time=None,timeout=None):
         deploy_args={}
         codes = []
         cargs = []
@@ -600,12 +621,20 @@ class DioxClient:
             args=deploy_args,
             is_delegatee=True
         )
-        tx_hash = self.send_raw_transaction(delegator.sign_diox_transaction(deployed_txn),True)
-        self.wait_for_deploy(tx_hash)
+        deploy_timeout = timeout if timeout is not None else max(
+            DEFAULT_TIMEOUT,
+            (compile_time or 0) * 6
+        )
+        tx_hash = self.send_raw_transaction(
+            delegator.sign_diox_transaction(deployed_txn),
+            True,
+            deploy_timeout,
+        )
+        self.wait_for_deploy(tx_hash, deploy_timeout)
         return tx_hash
 
     @exception_handler
-    def wait_for_deploy(self,deploy_hash):
+    def wait_for_deploy(self, deploy_hash, timeout=DEFAULT_TIMEOUT):
         state = self.get_contract_state("core","contracts",Scope.Global,None).State
         target_height = -1
         if state is not None and state != {}:
@@ -613,9 +642,17 @@ class DioxClient:
                 if s.BuildKey == deploy_hash:
                     target_height = s.TargetHeight
                     break
+        if target_height < 0:
+            raise DioxError(-10005, "deploy not found in scheduled contracts")
         base = cur_height = self.get_block_number()
+        deadline = time.time() + timeout
         while cur_height <= target_height:
             progress_bar(cur_height-base,target_height-base,title="Deploy Process: ")
+            if time.time() > deadline:
+                raise DioxError(
+                    -10006,
+                    "deploy timeout waiting for target height {}".format(target_height)
+                )
             cur_height = self.get_block_number()
             time.sleep(0.5)
         print("\nDeploy finish.")
@@ -632,7 +669,11 @@ class DioxClient:
     @exception_handler
     def get_contract_state(self,dapp_name,contract_name,scope:Scope,key):
         method = "dx.contract_state"
-        params = {"contract_with_scope":str(dapp_name)+"."+str(contract_name)+"."+scope.name.lower()}
+        contract_ref = str(dapp_name)+"."+str(contract_name)
+        if "." in str(contract_name):
+            contract_info = self.get_contract_info(dapp_name, contract_name)
+            contract_ref = str(contract_info.ContractVersionID)
+        params = {"contract_with_scope":contract_ref+"."+scope.name.lower()}
         if scope.value != scope.Global.value:
             params.update({"scope_key":key})
         response = self.make_request(method,params)
@@ -900,6 +941,217 @@ class DioxClient:
         State object.
     @TBD: use enum for flags
     """
+    @exception_handler
+    def regulation_block(self, regulator: DioxAccount, address: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.regulation.block",
+            args={"Address": address},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def regulation_unblock(self, regulator: DioxAccount, address: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.regulation.unblock",
+            args={"Address": address},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def regulation_set_audit(self, regulator: DioxAccount, contract_id_raw: int, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.regulation.set_audit",
+            args={"ContractIdRaw": contract_id_raw},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def get_regulation_state(self):
+        return self.get_contract_state("core", "regulation", Scope.Global, None)
+
+    @exception_handler
+    def rotation_add_node(self, regulator: DioxAccount, address: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.rotation.address.add_node",
+            args={"Address": address},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def rotation_remove_node(self, regulator: DioxAccount, address: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.rotation.address.remove_node",
+            args={"Address": address},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def rotation_report_violation(self, regulator: DioxAccount, miner: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=regulator,
+            function="core.rotation.address.report_violation",
+            args={"Miner": miner},
+            is_sync=sync,
+            timeout=timeout
+        )
+
+    @exception_handler
+    def get_rotation_state(self):
+        return self.get_contract_state("core", "rotation", Scope.Global, None)
+
+    # Regulation-managed AuditProxy administration -------------------------------
+    _OLD_AUDIT_PROXY_FIELDS = frozenset(
+        {
+            "check_name",
+            "audit_name",
+            "dapp_name",
+            "contract_name",
+            "impl_cid",
+            "app_cid",
+            "dapp_contract",
+            "target_dapp_contract",
+            "audit_dapp_contract",
+        }
+    )
+
+    def _validate_regulation_audit_proxy_args(self, function_name: str, args: dict):
+        bad = self._OLD_AUDIT_PROXY_FIELDS & args.keys()
+        if bad:
+            raise ValueError(
+                f"Obsolete field(s) {sorted(bad)} in {function_name} args; "
+                "use audit_dc / target_dc / cid instead"
+            )
+
+    def _normalize_regulation_audit_proxy_args(self, function_name: str, args):
+        if isinstance(args, str):
+            return args
+        normalized_args = dict(args or {})
+        self._validate_regulation_audit_proxy_args(function_name, normalized_args)
+        return json.dumps(normalized_args, separators=(",", ":"))
+
+    def _split_dapp_contract_name(self, dapp_contract: str) -> tuple[str, str]:
+        parts = dapp_contract.split(".")
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            raise ValueError(
+                f"Invalid dapp contract name: {dapp_contract}; expected 'DApp.Contract'"
+            )
+        return parts[0], parts[1]
+
+    def _extract_audit_result_from_tx(self, tx_hash: str) -> tuple[bool, str]:
+        try:
+            tx = self.get_transaction(tx_hash)
+            relays = self.get_all_relay_transactions(tx, detail=True)
+            for r in relays:
+                inv = getattr(r, "Invocation", None)
+                if inv is None:
+                    continue
+                ret_val = getattr(inv, "ReturnValue", None) or getattr(inv, "return_value", None)
+                if ret_val and isinstance(ret_val, dict):
+                    ok = bool(ret_val.get("ok", False))
+                    msg = str(ret_val.get("msg", "ok" if ok else ""))
+                    return ok, msg
+        except Exception:
+            pass
+        return True, "ok"
+
+    @exception_handler
+    def regulation_call_audit_proxy(self, regulator: DioxAccount, function_name: str, args, sync=True, timeout=DEFAULT_TIMEOUT) -> "AuditProxyResult":
+        tx_hash = self.send_transaction(
+            user=regulator,
+            function="core.regulation.call_audit_proxy",
+            args={
+                "function_name": function_name,
+                "args_json": self._normalize_regulation_audit_proxy_args(function_name, args),
+            },
+            is_sync=sync,
+            timeout=timeout,
+        )
+        if not sync or tx_hash is None:
+            return AuditProxyResult(ok=True, msg="ok", tx_hash=tx_hash)
+        ok, msg = self._extract_audit_result_from_tx(tx_hash)
+        return AuditProxyResult(ok=ok, msg=msg, tx_hash=tx_hash)
+
+    @exception_handler
+    def register_audit(
+        self,
+        regulator: DioxAccount,
+        audit_dc: str,
+        cid: int | None = None,
+        sync=True,
+        timeout=DEFAULT_TIMEOUT,
+    ) -> "AuditProxyResult":
+        if cid is None:
+            dapp_name, contract_name = self._split_dapp_contract_name(audit_dc)
+            contract_info = self.get_contract_info(dapp_name, contract_name)
+            cid = int(contract_info.ContractID)
+        return self.regulation_call_audit_proxy(
+            regulator=regulator,
+            function_name="core.AuditProxy.register",
+            args={"audit_dc": audit_dc, "cid": cid},
+            sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def unregister_audit(
+        self,
+        regulator: DioxAccount,
+        audit_dc: str,
+        sync=True,
+        timeout=DEFAULT_TIMEOUT,
+    ) -> "AuditProxyResult":
+        return self.regulation_call_audit_proxy(
+            regulator=regulator,
+            function_name="core.AuditProxy.unregister",
+            args={"audit_dc": audit_dc},
+            sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def bind_audit(
+        self,
+        regulator: DioxAccount,
+        target_dc: str,
+        audit_dc: str,
+        sync=True,
+        timeout=DEFAULT_TIMEOUT,
+    ) -> "AuditProxyResult":
+        return self.regulation_call_audit_proxy(
+            regulator=regulator,
+            function_name="core.AuditProxy.bind",
+            args={"target_dc": target_dc, "audit_dc": audit_dc},
+            sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def unbind_audit(
+        self,
+        regulator: DioxAccount,
+        target_dc: str,
+        audit_dc: str,
+        sync=True,
+        timeout=DEFAULT_TIMEOUT,
+    ) -> "AuditProxyResult":
+        return self.regulation_call_audit_proxy(
+            regulator=regulator,
+            function_name="core.AuditProxy.unbind",
+            args={"target_dc": target_dc, "audit_dc": audit_dc},
+            sync=sync,
+            timeout=timeout,
+        )
+
     @exception_handler
     def create_token(self,user:DioxAccount,symbol,initial_supply,deposit,decimals,cid=0,minter_flag=1,token_flag=0,sync=True,timeout=DEFAULT_TIMEOUT):
         tx_hash = self.send_transaction(
