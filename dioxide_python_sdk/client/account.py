@@ -293,20 +293,39 @@ class DioxAccount:
         ret.update({"AddressType":self.account_type.name})
         return ret
 
+    def _get_sm2_crypt(self):
+        from gmssl.sm2 import CryptSM2
+
+        return CryptSM2(
+            private_key=self.__private_key.hex(),
+            public_key=self.__public_key.hex(),
+            asn1=False,
+        )
+
     def sign(self,msg:bytes):
         try:
-            sk = ed25519.SigningKey(sk_s=self.__private_key)
-            sig = sk.sign(msg)
+            if self.account_type == DioxAccountType.ED25519:
+                sk = ed25519.SigningKey(sk_s=self.__private_key)
+                sig = sk.sign(msg)
+            elif self.account_type == DioxAccountType.SM2:
+                sig_hex = self._get_sm2_crypt().sign_with_sm3(msg)
+                sig = bytes.fromhex(sig_hex)
+                if len(sig) != 64:
+                    return None
+            else:
+                return None
         except:
             return None
         return sig
 
     def sign_diox_transaction(self,txdata:bytes):
         try:
-            sk = ed25519.SigningKey(sk_s=self.__private_key)
             sid = self.account_type.value.to_bytes(1,byteorder="little")
-            sig = sk.sign(txdata  + sid + self.__public_key)
-            signed_tx_data = txdata + sid + self.__public_key +  sig
+            sign_payload = txdata + sid + self.__public_key
+            sig = self.sign(sign_payload)
+            if sig is None:
+                return None
+            signed_tx_data = sign_payload + sig
             # calculate txn pow
             nonces:list[int] = calculate_txn_pow(signed_tx_data)
             for nonce in nonces:
@@ -318,8 +337,15 @@ class DioxAccount:
 
     def verify(self,sig,msg):
         try:
-            pk = ed25519.VerifyingKey(vk_s=self.__public_key)
-            pk.verify(sig,msg)
+            if self.account_type == DioxAccountType.ED25519:
+                pk = ed25519.VerifyingKey(vk_s=self.__public_key)
+                pk.verify(sig,msg)
+            elif self.account_type == DioxAccountType.SM2:
+                if len(sig) != 64:
+                    return False
+                return self._get_sm2_crypt().verify_with_sm3(sig.hex(), msg)
+            else:
+                return False
         except:
             return False
         return True

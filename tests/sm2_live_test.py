@@ -8,7 +8,9 @@ from dioxide_python_sdk.client.dioxclient import DioxClient, DioxError
 
 
 RPC_URL = os.getenv("DIOX_RPC_URL", "http://101.33.210.216:45678/api")
-PRIVATE_KEY = os.getenv("DIOX_SM2_PRIVATE_KEY", "+OfM+tj9R8I/BnIjCvc+JAdl0ADy1vAkbu0n2KINwzw=")
+PRIVATE_KEY = os.getenv(
+    "DIOX_SM2_PRIVATE_KEY", "+OfM+tj9R8I/BnIjCvc+JAdl0ADy1vAkbu0n2KINwzw="
+)
 PUBLIC_KEY = os.getenv(
     "DIOX_SM2_PUBLIC_KEY",
     "AX1hRvLswVwarsbSDiQHzxmSGwR95G4DPfjnLP2oAtDr3kNsJ7X7Q5l5yhnWg/5hTe30O/CZRIbOvv94y3cmvQ==",
@@ -19,7 +21,11 @@ ADDRESS = os.getenv(
 )
 AMOUNT = os.getenv("DIOX_MINT_AMOUNT", "999999999999999999999999999999")
 SEND_TX = os.getenv("DIOX_SEND_LIVE_TX", "").lower() in {"1", "true", "yes"}
-USE_NODE_SIGNING = os.getenv("DIOX_USE_NODE_SIGNING", "1").lower() in {"1", "true", "yes"}
+USE_NODE_SIGNING = os.getenv("DIOX_USE_NODE_SIGNING", "1").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 def main():
