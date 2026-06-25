@@ -108,6 +108,179 @@ header = client.get_consensus_header_by_hash("block_hash")
 
 **Returns**: `dict` - consensus header
 
+#### get_consensus_incentive()
+
+Get global consensus incentive parameters.
+
+```python
+incentive = client.get_consensus_incentive()
+```
+
+**Returns**: `dict` - consensus incentive parameters, including `BaseBlockReward`, `CrossShardRewardPool`, `RewardAdjustAlpha`, `RewardConcentrationLambda`, `PenaltyMaxFine`, `PenaltyReserve`, `RewardReserve`, dynamic reward load parameters, and `RewardRatioDenominator`
+
+#### get_consensus_fee_attribution()
+
+Get the latest consensus fee attribution settlement record.
+
+```python
+fee_attribution = client.get_consensus_fee_attribution()
+```
+
+**Returns**: `dict` - fee attribution record, including `SourceHeight`, `SourceRelayCount`, `AttributionSource`, `SourceGasFee`, `GasReward`, `CrossShardPoolContribution`, and `CrossShardReward`
+
+#### get_miner_stats(address)
+
+Get accumulated consensus mining statistics for an address.
+
+```python
+stats = client.get_miner_stats(account.address)
+```
+
+**Parameters**:
+- `address` (str): Miner address
+
+**Returns**: `dict` - miner statistics, including `LastMined`, `MinedCount`, `CrossShardVerifiedCount`, `CrossShardVerifiedWeight`, `LastActiveHeight`, `OfflineStage`, `TotalReward`, `TotalBaseReward`, `TotalGasReward`, `TotalCrossShardReward`, `TotalPenalty`, and `InefficientRounds`. `InefficientRounds` is maintained by the chain and is used by the consensus reward calculation to reduce later block reward weight for inefficient miners.
+
+#### get_staking_info(address)
+
+Get staking amount, unlock amount, unlock height, and pending penalty state for an address.
+
+```python
+staking = client.get_staking_info(account.address)
+```
+
+**Parameters**:
+- `address` (str): Staker address
+
+**Returns**: `dict` - staking state, including `Amount`, `StartTime`, `UnlockAmount`, `UnlockHeight`, and `PendingPenalty`
+
+#### get_consensus_penalty(address)
+
+Get consensus penalty state for an address.
+
+```python
+penalty = client.get_consensus_penalty(account.address)
+```
+
+**Parameters**:
+- `address` (str): Miner address
+
+**Returns**: `dict` - consensus penalty state, including `PendingPenalty`, `EvidenceHash`, `EvidenceStatus`, `ResponsibleMiner`, `EvidenceObjectType`, `EvidenceObjectHeight`, `EvidenceObjectShard`, `EvidenceObjectResponsibleMiner`, `EvidenceReason`, `EvidenceProofSummaryHash`, `EvidenceSubjectHeight`, `EvidenceSubjectShard`, `ReviewAmount`, `ReviewStartHeight`, `ReviewEndHeight`, `EvidenceType`, `PenaltyReserve`, and `PenaltyMaxFine`. `EvidenceReason` is one of the `PenaltyEvidenceReason` values; reason `4` (`CROSS_SHARD_MESSAGE_TAMPER`) triggers full-stake slashing (design_spec 2.4).
+
+#### consensus_pending_penalty(user, miner, amount, evidence_hash, reason=1, sync=True, timeout=60)
+
+Submit a consensus pending penalty request.
+
+```python
+tx_hash = client.consensus_pending_penalty(
+    user=controller,
+    miner=miner_address,
+    amount=300,
+    evidence_hash="evidence_hash",
+)
+```
+
+**Parameters**:
+- `user` (DioxAccount): Transaction sender
+- `miner` (str): Target miner address
+- `amount` (int or str): Pending penalty amount
+- `evidence_hash` (str): Non-empty evidence hash
+- `reason` (int or `PenaltyEvidenceReason`): Evidence reason; defaults to `1` (`INVALID_POSW`). Import `from dioxide_python_sdk.client.types import PenaltyEvidenceReason` and pass `PenaltyEvidenceReason.CROSS_SHARD_MESSAGE_TAMPER` (value `4`) for design_spec 2.4 cross-shard tamper, which slashes the full stake regardless of `amount` or `PenaltyMaxFine`.
+- `sync` (bool): Wait for confirmation
+- `timeout` (int): Timeout seconds
+
+**Returns**: `str` - transaction hash
+
+#### consensus_penalty(user, miner, amount, evidence_hash, sync=True, timeout=60)
+
+Submit a consensus penalty execution request.
+
+```python
+tx_hash = client.consensus_penalty(
+    user=controller,
+    miner=miner_address,
+    amount=400,
+    evidence_hash="evidence_hash",
+)
+```
+
+**Parameters**:
+- `user` (DioxAccount): Transaction sender
+- `miner` (str): Target miner address
+- `amount` (int or str): Requested penalty amount
+- `evidence_hash` (str): Non-empty evidence hash
+- `sync` (bool): Wait for confirmation
+- `timeout` (int): Timeout seconds
+
+**Returns**: `str` - transaction hash
+
+#### consensus_inefficient_penalty(user, miner, amount, inefficient_round_delta, evidence_hash, sync=True, timeout=60)
+
+Submit a consensus inefficient behavior penalty request.
+
+```python
+tx_hash = client.consensus_inefficient_penalty(
+    user=controller,
+    miner=miner_address,
+    amount=100,
+    inefficient_round_delta=2,
+    evidence_hash="evidence_hash",
+)
+```
+
+**Parameters**:
+- `user` (DioxAccount): Transaction sender
+- `miner` (str): Target miner address
+- `amount` (int or str): Requested penalty amount
+- `inefficient_round_delta` (int): Inefficient round increment
+- `evidence_hash` (str): Non-empty evidence hash
+- `sync` (bool): Wait for confirmation
+- `timeout` (int): Timeout seconds
+
+**Returns**: `str` - transaction hash
+
+#### staking_unlock_request(user, staker, amount, unlock_height, sync=True, timeout=60)
+
+Submit a staking unlock request.
+
+```python
+tx_hash = client.staking_unlock_request(
+    user=account,
+    staker=account.address,
+    amount=200,
+    unlock_height=55,
+)
+```
+
+**Parameters**:
+- `user` (DioxAccount): Transaction sender
+- `staker` (str): Staker address
+- `amount` (int or str): Unlock amount
+- `unlock_height` (int): Requested unlock height
+- `sync` (bool): Wait for confirmation
+- `timeout` (int): Timeout seconds
+
+**Returns**: `str` - transaction hash
+
+#### staking_release(user, staker, sync=True, timeout=60)
+
+Submit a staking release transaction.
+
+```python
+tx_hash = client.staking_release(
+    user=account,
+    staker=account.address,
+)
+```
+
+**Parameters**:
+- `user` (DioxAccount): Transaction sender
+- `staker` (str): Staker address
+- `sync` (bool): Wait for confirmation
+- `timeout` (int): Timeout seconds
+
+**Returns**: `str` - transaction hash
+
 #### get_transaction_block_by_height(shard_index, height)
 
 Get transaction block by shard and height.

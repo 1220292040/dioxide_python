@@ -155,6 +155,101 @@ class DioxClient:
     def get_overview(self):
         return self.make_request("dx.overview",{})
 
+    @exception_handler
+    def get_chain_info(self):
+        overview = self.get_overview()
+        if isinstance(overview, dict) and "Height" not in overview and "HeadHeight" in overview:
+            overview = dict(overview)
+            overview["Height"] = overview["HeadHeight"]
+        return Box(overview, default_box=True)
+
+    """
+    @description:
+        Return global consensus incentive parameters.
+    @params:
+        None
+    @response -- object:
+        BaseBlockReward, CrossShardRewardPool, RewardAdjustAlpha,
+        RewardConcentrationLambda, PenaltyMaxFine, PenaltyReserve,
+        RewardReserve, DynamicRewardTxLoadPpm, DynamicRewardRelayLoadPpm,
+        DynamicRewardGasLoadPpm, DynamicRewardMaxMultiplierPpm,
+        RewardRatioDenominator.
+    """
+    @exception_handler
+    def get_consensus_incentive(self):
+        method = "dx.consensus_incentive"
+        params = {}
+        response = self.make_request(method, params)
+        return Box(response, default_box=True)
+
+    """
+    @description:
+        Return latest consensus fee attribution settlement record.
+    @params:
+        None
+    @response -- object:
+        SourceHeight, SourceRelayCount, AttributionSource, SourceGasFee, GasReward,
+        CrossShardPoolContribution, CrossShardReward.
+    """
+    @exception_handler
+    def get_consensus_fee_attribution(self):
+        method = "dx.consensus_fee_attribution"
+        params = {}
+        response = self.make_request(method, params)
+        return Box(response, default_box=True)
+
+    """
+    @description:
+        Return accumulated consensus mining statistics for an address.
+    @params:
+        address: miner address
+    @response -- object:
+        LastMined, MinedCount, CrossShardVerifiedCount, CrossShardVerifiedWeight,
+        LastActiveHeight, OfflineStage,
+        TotalReward, TotalBaseReward, TotalGasReward,
+        TotalCrossShardReward, TotalPenalty, InefficientRounds.
+    """
+    @exception_handler
+    def get_miner_stats(self, address):
+        method = "dx.miner_stats"
+        params = {"address": address}
+        response = self.make_request(method, params)
+        return Box(response, default_box=True)
+
+    """
+    @description:
+        Return staking amount, unlock amount, unlock height, and pending penalty for an address.
+    @params:
+        address: staker address
+    @response -- object:
+        Amount, StartTime, UnlockAmount, UnlockHeight, PendingPenalty.
+    """
+    @exception_handler
+    def get_staking_info(self, address):
+        method = "dx.staking_info"
+        params = {"address": address}
+        response = self.make_request(method, params)
+        return Box(response, default_box=True)
+
+    """
+    @description:
+        Return consensus penalty state for an address.
+    @params:
+        address: miner address
+    @response -- object:
+        PendingPenalty, EvidenceHash, EvidenceStatus,
+        ResponsibleMiner, ReviewAmount, ReviewStartHeight, ReviewEndHeight, EvidenceType,
+        EvidenceObjectType, EvidenceObjectHeight, EvidenceObjectShard, EvidenceObjectResponsibleMiner,
+        EvidenceReason, EvidenceProofSummaryHash, EvidenceSubjectHeight, EvidenceSubjectShard,
+        PenaltyReserve, PenaltyMaxFine.
+    """
+    @exception_handler
+    def get_consensus_penalty(self, address):
+        method = "dx.consensus_penalty"
+        params = {"address": address}
+        response = self.make_request(method, params)
+        return Box(response, default_box=True)
+
 
     """
     @description:
@@ -879,7 +974,153 @@ class DioxClient:
         )
 
     @exception_handler
+    def consensus_pending_penalty(self, user: DioxAccount, miner: str, amount, evidence_hash: str, reason=1, sync=True, timeout=DEFAULT_TIMEOUT):
+        # `reason` accepts an int or a dioxtypes.PenaltyEvidenceReason member.
+        # Use PenaltyEvidenceReason.CROSS_SHARD_MESSAGE_TAMPER for design_spec 2.4
+        # (cross-shard tamper -> full stake slash, bypassing PenaltyMaxFine).
+        if isinstance(reason, dioxtypes.PenaltyEvidenceReason):
+            reason = reason.value
+        return self.send_transaction(
+            user=user,
+            function="core.coin.consensus_pending_penalty",
+            args={
+                "Miner": "{}".format(miner),
+                "Amount": "{}".format(amount),
+                "EvidenceHash": "{}".format(evidence_hash),
+                "Reason": int(reason),
+            },
+            is_sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def consensus_penalty(self, user: DioxAccount, miner: str, amount, evidence_hash: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=user,
+            function="core.coin.consensus_penalty",
+            args={
+                "Miner": "{}".format(miner),
+                "Amount": "{}".format(amount),
+                "EvidenceHash": "{}".format(evidence_hash),
+            },
+            is_sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def consensus_penalty_reject(self, user: DioxAccount, evidence_hash: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=user,
+            function="core.coin.consensus_penalty_reject",
+            args={
+                "EvidenceHash": "{}".format(evidence_hash),
+            },
+            is_sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def consensus_penalty_expire(self, user: DioxAccount, miner: str, evidence_hash: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=user,
+            function="core.coin.consensus_penalty_expire",
+            args={
+                "Miner": "{}".format(miner),
+                "EvidenceHash": "{}".format(evidence_hash),
+            },
+            is_sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def consensus_penalty_appeal(self, user: DioxAccount, miner: str, evidence_hash: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=user,
+            function="core.coin.consensus_penalty_appeal",
+            args={
+                "Miner": "{}".format(miner),
+                "EvidenceHash": "{}".format(evidence_hash),
+            },
+            is_sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def consensus_penalty_appeal_resolve(
+        self,
+        user: DioxAccount,
+        miner: str,
+        evidence_hash: str,
+        restore: bool,
+        sync=True,
+        timeout=DEFAULT_TIMEOUT,
+    ):
+        return self.send_transaction(
+            user=user,
+            function="core.coin.consensus_penalty_appeal_resolve",
+            args={
+                "Miner": "{}".format(miner),
+                "EvidenceHash": "{}".format(evidence_hash),
+                "Restore": restore,
+            },
+            is_sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def consensus_inefficient_penalty(
+        self,
+        user: DioxAccount,
+        miner: str,
+        amount,
+        inefficient_round_delta: int,
+        evidence_hash: str,
+        sync=True,
+        timeout=DEFAULT_TIMEOUT,
+    ):
+        return self.send_transaction(
+            user=user,
+            function="core.coin.consensus_inefficient_penalty",
+            args={
+                "Miner": "{}".format(miner),
+                "Amount": "{}".format(amount),
+                "InefficientRoundDelta": int(inefficient_round_delta),
+                "EvidenceHash": "{}".format(evidence_hash),
+            },
+            is_sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def staking_unlock_request(self, user: DioxAccount, staker: str, amount, unlock_height: int, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=user,
+            function="core.coin.unlock_request",
+            args={
+                "Staker": "{}".format(staker),
+                "Amount": "{}".format(amount),
+                "UnlockHeight": int(unlock_height),
+            },
+            is_sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
+    def staking_release(self, user: DioxAccount, staker: str, sync=True, timeout=DEFAULT_TIMEOUT):
+        return self.send_transaction(
+            user=user,
+            function="core.coin.release",
+            args={
+                "Staker": "{}".format(staker),
+            },
+            is_sync=sync,
+            timeout=timeout,
+        )
+
+    @exception_handler
     def transfer(self,sender:DioxAccount,receiver,amount,token="DIO",delegatee=None,sync=True,timeout=DEFAULT_TIMEOUT):
+        if delegatee is not None and ":" not in str(delegatee) and token != "DIO" and str(delegatee) == str(token):
+            delegatee = "{}:token".format(delegatee)
         args = {
             "To":"{}".format(receiver),
             "Amount":"{}".format(amount),
@@ -1169,7 +1410,7 @@ class DioxClient:
             is_sync=sync
         )
         if sync:
-            ok = self.wait_for_token_deployed(tx_hash,timeout)
+            ok = self.wait_for_token_deployed(tx_hash,timeout,symbol)
         else:
             ok = None
         return tx_hash,ok
@@ -1254,10 +1495,24 @@ class DioxClient:
                 return False
         return True
 
-    def wait_for_token_deployed(self,tx_hash,timeout):
+    def wait_for_token_deployed(self,tx_hash,timeout,token_symbol=None):
         if not self.wait_for_transaction_confirmed(tx_hash,timeout):
             return False
         tx = self.get_transaction(tx_hash)
+        if not self.is_tx_success(tx):
+            return False
+        if token_symbol is not None:
+            start = time.time()
+            while True:
+                try:
+                    token_info = self.get_token_info(token_symbol)
+                    if token_info is not None and not getattr(token_info, "error", None):
+                        return True
+                except Exception:
+                    pass
+                if time.time() - start > timeout:
+                    return False
+                time.sleep(1)
         if not self.is_tx_success_with_relays(tx):
             return False
         relays = self.get_all_relay_transactions(tx,detail=True)
