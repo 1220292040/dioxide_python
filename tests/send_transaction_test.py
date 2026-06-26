@@ -41,6 +41,71 @@ class TestGetTransactionGroupRelayHash(unittest.TestCase):
         self.assertNotIn("shard_index", params)
 
 
+class TestTransferDelegateeNormalization(unittest.TestCase):
+    def setUp(self):
+        self.client = DioxClient()
+
+    @patch.object(DioxClient, "send_transaction")
+    def test_transfer_normalizes_token_symbol_delegatee(self, mock_send_transaction):
+        sender = MagicMock()
+        mock_send_transaction.return_value = "txhash"
+
+        result = self.client.transfer(
+            sender=sender,
+            receiver="receiver",
+            amount=100,
+            token="TESTTKN",
+            delegatee="TESTTKN",
+            sync=False,
+            timeout=7,
+        )
+
+        self.assertEqual(result, "txhash")
+        mock_send_transaction.assert_called_once_with(
+            user=sender,
+            function="core.wallet.transfer",
+            args={
+                "To": "receiver",
+                "Amount": "100",
+                "TokenId": "TESTTKN",
+            },
+            delegatee="TESTTKN:token",
+            is_sync=False,
+            timeout=7,
+        )
+
+
+class TestTokenDeploymentWait(unittest.TestCase):
+    def setUp(self):
+        self.client = DioxClient()
+
+    @patch.object(DioxClient, "get_token_info")
+    @patch.object(DioxClient, "get_transaction")
+    @patch.object(DioxClient, "wait_for_transaction_confirmed")
+    def test_wait_for_token_deployed_uses_token_state_not_refund_relay_status(
+        self,
+        mock_wait_for_transaction_confirmed,
+        mock_get_transaction,
+        mock_get_token_info,
+    ):
+        tx = {
+            "Hash": "create-token-tx",
+            "ConfirmState": "CONFIRMED",
+            "Invocation": {
+                "Status": "IVKRET_SUCCESS",
+                "Relays": ["refund-relay:0"],
+            },
+        }
+        mock_wait_for_transaction_confirmed.return_value = True
+        mock_get_transaction.return_value = tx
+        mock_get_token_info.return_value = {"TokenId": "TESTTKN"}
+
+        result = self.client.wait_for_token_deployed("create-token-tx", 1, "TESTTKN")
+
+        self.assertTrue(result)
+        mock_get_token_info.assert_called_once_with("TESTTKN")
+
+
 class TestRegulationAuditProxyCalls(unittest.TestCase):
     def setUp(self):
         self.client = DioxClient()

@@ -48,28 +48,28 @@ class TestDelegatedTokenTransfer:
         assert token_info is not None, "Token info should be available"
         print(f"Token info: {token_info}")
         
-        print(f"Step 4: Transfer token from creator to sender")
+        print(f"Step 4: Delegated token transfer from token address to sender")
         transfer_tx1 = self.client.transfer(
             sender=self.creator_account,
             receiver=self.sender_account.address,
             amount=1000,
             token=token_symbol,
+            delegatee=token_symbol,
             sync=True,
             timeout=60
         )
-        assert transfer_tx1 is not None, "First transfer should succeed"
+        assert transfer_tx1 is not None, "Delegated token transfer should succeed"
         
-        print(f"Step 5: Delegated token transfer from sender to receiver")
+        print(f"Step 5: Regular token transfer from sender to receiver")
         transfer_tx2 = self.client.transfer(
             sender=self.sender_account,
             receiver=self.receiver_account.address,
             amount=100,
             token=token_symbol,
-            delegatee=token_symbol,
             sync=True,
             timeout=60
         )
-        assert transfer_tx2 is not None, "Delegated transfer should succeed"
+        assert transfer_tx2 is not None, "Sender token transfer should succeed"
         
         print(f"Step 6: Verify transaction")
         tx_obj = self.client.get_transaction(transfer_tx2)
