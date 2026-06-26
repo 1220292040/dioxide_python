@@ -57,6 +57,18 @@ TXN_CONFIRMED_STATUS = [TxnConfirmState.TXN_ARCHIVED.name,TxnConfirmState.TXN_CO
 TXN_FINALIZED_STATUS = [TxnConfirmState.TXN_ARCHIVED.name,TxnConfirmState.TXN_FINALIZED.name]
 TXN_ARCHIVED_STATUS = [TxnConfirmState.TXN_ARCHIVED.name]
 
+class PenaltyEvidenceReason(Enum):
+    # Mirror of CONSENSUS_PENALTY_EVIDENCE_REASON_* in oxd_bc core_coin_global.h.
+    # Pass the .value to consensus_pending_penalty(reason=...).
+    NONE = 0
+    INVALID_POSW = 1
+    DOUBLE_SPEND = 2
+    INVALID_CROSS_SHARD_PROOF = 3
+    CROSS_SHARD_MESSAGE_TAMPER = 4   # design_spec 2.4: tamper -> full stake slash
+    INEFFICIENT_VERIFICATION = 5
+    LONG_OFFLINE = 6
+
+
 class SubscribeTopic(Enum):
     CONSENSUS_HEADER = auto()
     TRANSACTION_BLOCK = auto()
