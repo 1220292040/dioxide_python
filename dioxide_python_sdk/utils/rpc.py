@@ -2,18 +2,20 @@
 from ..client.stat import StatTool
 import logging
 import json
-from ..utils.request import make_post_request
+import requests
 
 class HTTPProvide:
     logger = logging.getLogger("client.providers.HTTPProvider")
-    request_params = {}
-    request_kwargs = None
     def __init__(self,url=None,kwargs=None):
+        # Request parameters are mutable and must be isolated per client. A class-level
+        # dictionary makes concurrent clients overwrite each other's ``req`` method.
+        self.request_params = {}
         if url is None:
             self.url = "http://127.0.0.1:45678/api"
         else:
             self.url = url
         self.request_kwargs = kwargs or {}
+        self.session = requests.Session()
     
     def encode_rpc_request(self,method,params):
         self.request_params.update({"req":method})
@@ -28,10 +30,10 @@ class HTTPProvide:
         self.logger.debug("[request::%s,%s], data: %s",
                           self.url, method,request_data)
 
-        raw_response = make_post_request(
+        raw_response = self.session.post(
             self.url,
-            self.request_params,
-            request_data,
+            params=self.request_params,
+            data=request_data,
             **self.request_kwargs
         )
         response = self.decode_rpc_response(raw_response)
